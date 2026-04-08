@@ -11,15 +11,11 @@ export default function TeamUpBoard() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">빌드업 팀 매칭</h1>
-          <p className="text-gray-500 mt-2 font-medium">검증된 AI 스펙 인증서를 첨부하여 팀원을 모집하거나 지원해 보세요.</p>
-        </div>
+      <div className="flex justify-end mb-2">
         <button className="px-5 py-2.5 bg-primary text-white font-semibold rounded-xl hover:bg-primary/90 transition-colors shadow-sm">
           모집글 작성
         </button>
-      </header>
+      </div>
 
       <div className="flex flex-col gap-4 mt-4">
         {dummyTeams.map((team, i) => (

@@ -5,7 +5,6 @@ import { Suspense } from "react";
 import DashboardOverview from "@/components/DashboardOverview";
 import DiscoveryFeed from "@/components/DiscoveryFeed";
 import RoadmapPathfinder from "@/components/RoadmapPathfinder";
-import TeamUpBoard from "@/components/TeamUpBoard";
 import CalendarSync from "@/components/CalendarSync";
 
 function DashboardContent() {
@@ -14,12 +13,13 @@ function DashboardContent() {
 
   return (
     <div className="animate-in fade-in zoom-in-95 duration-500">
-      {currentTab === "dashboard" && <DashboardOverview />}
+      {(currentTab === "dashboard" || currentTab === "ai-analysis") && <DashboardOverview />}
       {currentTab === "feed" && <DiscoveryFeed />}
       {currentTab === "roadmap" && <RoadmapPathfinder />}
-      {currentTab === "team" && <TeamUpBoard />}
       {currentTab === "calendar" && <CalendarSync />}
-      {currentTab === "settings" && <div>Settings Placeholder</div>}
+      {(currentTab === "settings" || currentTab === "profile") && <div>Settings Placeholder</div>}
+      {currentTab === "portfolio" && <div>Portfolio Placeholder</div>}
+      {currentTab === "internship" && <div>Internship Guide Placeholder</div>}
     </div>
   );
 }

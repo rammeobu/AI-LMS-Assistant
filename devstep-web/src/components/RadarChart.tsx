@@ -3,12 +3,12 @@
 import { PolarAngleAxis, PolarGrid, PolarRadiusAxis, Radar, RadarChart as RechartsRadarChart, ResponsiveContainer, Tooltip } from "recharts";
 
 const mockRadarData = [
-  { subject: "프론트엔드", level: 85, fullMark: 100 },
-  { subject: "백엔드", level: 40, fullMark: 100 },
-  { subject: "CS 기초", level: 75, fullMark: 100 },
-  { subject: "알고리즘", level: 45, fullMark: 100 },
-  { subject: "협업/Git", level: 90, fullMark: 100 },
-  { subject: "오픈소스", level: 30, fullMark: 100 },
+  { subject: "기술 역량", level: 78, fullMark: 100 },
+  { subject: "실무 경험", level: 70, fullMark: 100 },
+  { subject: "자격증", level: 55, fullMark: 100 },
+  { subject: "프로젝트", level: 75, fullMark: 100 },
+  { subject: "대외활동", level: 60, fullMark: 100 },
+  { subject: "계획성", level: 65, fullMark: 100 },
 ];
 
 export default function RadarChart({ data = mockRadarData }) {

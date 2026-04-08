@@ -1,14 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Circle, ChevronDown, ChevronUp, Search, CalendarPlus, ChevronRight } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronUp, Search, CalendarPlus, ChevronRight } from "lucide-react";
 
 export default function RoadmapPathfinder() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("개발/데이터");
   const [selectedJob, setSelectedJob] = useState("백엔드 엔지니어");
-  const [isTimelineExpanded, setIsTimelineExpanded] = useState(false);
+  const [isSubTasksExpanded, setIsSubTasksExpanded] = useState(false);
 
   // Mega Menu Data
   const categories = ["개발/데이터", "인프라/보안", "기획/PM", "디자인"];
@@ -25,31 +25,35 @@ export default function RoadmapPathfinder() {
     ? allJobs.filter(job => job.toLowerCase().includes(searchQuery.toLowerCase()))
     : subCategories[activeCategory] || [];
 
-  // Dummy Roadmap Data
+  // Dummy Roadmap Data with SubTasks
   const roadmapSteps = [
-    { title: "Java / CS 기초 탑재", status: "completed", desc: "학점 연계 (완료)" },
-    { title: "알고리즘 코딩테스트", status: "completed", desc: "백준 Gold 5 (완료)" },
-    { title: "Spring/JPA 포트폴리오", status: "current", desc: "현재 집중 목표" },
-    { title: "대용량 트래픽 최적화", status: "pending", desc: "Redis 캐싱 (예정)" },
-    { title: "인턴십 직무 면접", status: "pending", desc: "카카오 채용 연계형 (예정)" },
+    { title: "Java / CS 기초 탑재", status: "completed", desc: "학점 연계 (완료)", subTasks: [] },
+    { title: "알고리즘 코딩테스트", status: "completed", desc: "백준 Gold 5 (완료)", subTasks: [] },
+    { 
+      title: "Spring/JPA 포트폴리오", 
+      status: "current", 
+      desc: "현재 집중 목표",
+      subTasks: [
+        { title: "인프런 스프링 MVC 1편 완강", status: "completed" },
+        { title: "JPA 기본 구조 및 엔티티 매핑 설계", status: "completed" },
+        { title: "도커(Docker) 기반 로컬 통합 환경 구성", status: "current" },
+        { title: "Spring Security OAuth2 소셜 로그인 연동", status: "current" },
+        { title: "Github Actions CI/CD 파이프라인 구축", status: "pending" },
+        { title: "AWS EC2 클라우드 무중단 배포", status: "pending" },
+      ]
+    },
+    { title: "대용량 트래픽 최적화", status: "pending", desc: "Redis 캐싱 (예정)", subTasks: [] },
+    { title: "인턴십 직무 면접", status: "pending", desc: "카카오 채용 연계형 (예정)", subTasks: [] },
   ];
 
   const currentIndex = roadmapSteps.findIndex(s => s.status === "current");
-  
-  // Decide which steps to show based on expansion state
-  let visibleSteps = roadmapSteps;
-  if (!isTimelineExpanded) {
-    const startObj = Math.max(0, currentIndex - 1);
-    const endObj = Math.min(roadmapSteps.length - 1, currentIndex + 1);
-    visibleSteps = roadmapSteps.slice(startObj, endObj + 1);
-  }
+  const [selectedStepIndex, setSelectedStepIndex] = useState(currentIndex);
+
+  const selectedStep = roadmapSteps[selectedStepIndex];
 
   return (
     <div className="flex flex-col gap-6 animate-in fade-in duration-500">
-      <header>
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">직무 로드맵 최적화 맵</h1>
-        <p className="text-gray-500 mt-2 font-medium">원하시는 직무를 검색하고 현재 달성해야 할 마일스톤에 집중하세요.</p>
-      </header>
+
 
       {/* Accordion Mega Menu for Job Search */}
       <div className="glass-card overflow-hidden">
@@ -142,159 +146,218 @@ export default function RoadmapPathfinder() {
         )}
       </div>
 
-      {/* Focused Timeline Panel */}
-      <div className="glass-card p-8 mt-2 relative min-h-[600px] flex flex-col">
-        <div className="flex justify-between items-center mb-12">
-           <h3 className="font-bold text-lg text-gray-900">맞춤형 성장 타임라인</h3>
-           <button 
-             onClick={() => setIsTimelineExpanded(!isTimelineExpanded)}
-             className="text-sm font-semibold text-primary hover:underline"
-           >
-             {isTimelineExpanded ? "축소하기" : "전체 체계도 보기"}
-           </button>
-        </div>
-
-        {/* Timeline Visuals */}
-        <div className={`flex flex-row items-center relative transition-all duration-700 ${isTimelineExpanded ? "justify-between" : "justify-center gap-12 sm:gap-24"}`}>
-           {visibleSteps.map((step, idx) => {
-             const isCompleted = step.status === "completed";
-             const isCurrent = step.status === "current";
-             const isPending = step.status === "pending";
+      {/* Focus: Master-Detail Architecture Panel */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 lg:gap-8 glass-card min-h-[600px] mt-2 border border-gray-100 shadow-sm relative items-start">
+        
+        {/* LEFT COLUMN: Master List (Sticky) */}
+        <div className="lg:col-span-1 lg:sticky lg:top-24 bg-gray-50/50 lg:bg-transparent p-6 lg:pb-6 lg:border-r border-gray-100">
+           <h3 className="font-bold text-lg text-gray-900 mb-8 px-2">마일스톤 챕터</h3>
+           
+           <div className="relative flex flex-col gap-10 lg:gap-8 ml-3">
+             {/* Vertical Connective Line */}
+             <div className="absolute left-[15px] top-4 bottom-4 w-[2px] bg-gray-200 z-0" />
              
-             // Scale Logics
-             const scaleClass = !isTimelineExpanded && isCurrent ? "scale-150 transform-origin-center z-20" : (!isTimelineExpanded ? "scale-75 opacity-60 z-10" : "scale-100");
-             // Absolute Connector Logic
-             const isLastVisible = idx === visibleSteps.length - 1;
+             {roadmapSteps.map((step, idx) => {
+               const isCompleted = step.status === "completed";
+               const isCurrent = step.status === "current";
+               const isSelected = selectedStepIndex === idx;
 
-             return (
-               <div key={step.title} className="flex flex-col items-center relative w-[180px]">
-                 {/* Node */}
+               return (
                  <div 
-                    onClick={() => isCurrent && !isTimelineExpanded && setIsTimelineExpanded(true)}
-                    className={`relative flex flex-col items-center gap-4 transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${scaleClass} ${isCurrent && !isTimelineExpanded ? "cursor-pointer" : ""}`}
+                   key={idx} 
+                   onClick={() => {
+                     setSelectedStepIndex(idx);
+                     setIsSubTasksExpanded(false);
+                   }}
+                   className={`relative z-10 flex items-start gap-4 cursor-pointer group transition-all duration-300`}
                  >
-                   <div className={`w-12 h-12 rounded-full flex items-center justify-center border-4 bg-white transition-colors duration-300 ${
-                     isCompleted ? "border-green-600 text-green-600 shadow-sm" :
-                     isCurrent ? "border-primary text-primary shadow-[0_0_20px_rgba(85,82,250,0.4)]" :
-                     "border-gray-200 text-gray-300"
+                   {/* Node Circle */}
+                   <div className={`w-8 h-8 rounded-full border-[3px] bg-white flex items-center justify-center shrink-0 transition-colors mt-0.5 ${
+                      isCompleted ? "border-emerald-500 text-emerald-500 shadow-sm z-10" :
+                      isCurrent && isSelected ? "border-primary text-primary shadow-[0_0_15px_rgba(85,82,250,0.4)] z-10 scale-110" :
+                      isCurrent && !isSelected ? "border-primary/50 text-primary/50 z-10" :
+                      isSelected ? "border-gray-800 bg-gray-800 text-white z-10 scale-110" :
+                      "border-gray-300 hover:border-gray-400 z-10"
                    }`}>
-                     {isCompleted ? <CheckCircle2 className="w-6 h-6" /> : <Circle className="w-4 h-4 fill-current" />}
+                      {isCompleted && <CheckCircle2 className="w-5 h-5 text-emerald-500 border-none bg-white rounded-full" />}
+                      {!isCompleted && isCurrent && <div className="w-2.5 h-2.5 bg-primary rounded-full animate-pulse" />}
                    </div>
 
-                   <div className={`text-center transition-all ${isTimelineExpanded ? "mt-2" : "mt-4"}`}>
-                     <h3 className={`font-bold mb-1 leading-tight ${
-                       isCompleted ? "text-green-800" :
-                       isCurrent ? "text-primary text-lg" : 
-                       "text-gray-400"
-                     }`}>
+                   {/* Node Text Content */}
+                   <div className={`flex flex-col flex-1 transition-all ${isSelected ? "opacity-100 -translate-y-0.5" : "opacity-50 group-hover:opacity-80"}`}>
+                     <h4 className={`font-bold text-sm leading-tight transition-colors ${
+                        isSelected && isCurrent ? "text-primary text-base" : 
+                        isSelected ? "text-gray-900 text-base" : 
+                        isCompleted ? "text-gray-600 line-through decoration-gray-300" :
+                        "text-gray-600"
+                      }`}>
                        {step.title}
-                     </h3>
-                     <p className={`text-xs font-bold px-2 py-0.5 rounded-md inline-block ${
-                       isCompleted ? "bg-green-50 text-green-700" :
+                     </h4>
+                     <span className={`text-[10px] sm:text-[11px] font-bold mt-1.5 px-2 py-0.5 rounded w-fit sm:whitespace-nowrap ${
+                       isCompleted ? "bg-emerald-50 text-emerald-700 font-medium" :
                        isCurrent ? "bg-primary/10 text-primary" : 
-                       "text-gray-400"
+                       "bg-white border border-gray-200 text-gray-500"
                      }`}>
                        {step.desc}
-                     </p>
-                   </div>
-                   
-                   {/* Click Ripple Hint */}
-                   {!isTimelineExpanded && isCurrent && (
-                     <span className="absolute -top-3 -right-3 text-[10px] bg-primary text-white px-1.5 py-0.5 rounded-full font-bold animate-bounce shadow-md pointer-events-none">
-                       Click!
                      </span>
-                   )}
+                   </div>
                  </div>
-
-                 {/* Connecting Line (Only draw if not the last visible item) */}
-                 {!isLastVisible && (
-                   <div className={`absolute left-[50%] h-[3px] -z-10 rounded-full transition-all duration-500 ${
-                     !isTimelineExpanded ? "top-6 w-[250px] sm:w-[350px]" : "top-6 w-full min-w-[50px] lg:min-w-[120px]"
-                   } ${isCompleted ? "bg-green-500" : "bg-gray-100"}`} />
-                 )}
-               </div>
-             );
-           })}
+               );
+             })}
+           </div>
         </div>
 
-        {/* Inline Recommendation Feed (Current Node Underneath Space) */}
-        {!isTimelineExpanded && (
-           <div className="mt-16 sm:mt-24 w-full flex flex-col items-center animate-in slide-in-from-bottom-8 fade-in relative">
-              {/* Connector line dropping down from the current node */}
-              <div className="w-[2px] h-12 sm:h-16 bg-gradient-to-b from-primary/30 to-transparent absolute -top-12 sm:-top-16 left-1/2 -translate-x-1/2" />
-              
-              <div className="w-full max-w-4xl bg-primary/5 border border-primary/10 rounded-2xl p-6 md:p-8 relative">
-                 {/* Milestone Progress Bar */}
-                 <div className="mb-8 bg-white border border-gray-100 p-5 rounded-xl shadow-sm">
-                   <div className="flex justify-between items-end mb-3">
-                     <div>
-                       <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Target Milestone</span>
-                       <h5 className="font-bold text-gray-900 text-base">Spring/JPA 포트폴리오 완성</h5>
-                     </div>
-                     <div className="text-right">
-                       <span className="text-[11px] font-bold text-gray-500 mr-2">현재 진행률</span>
-                       <span className="text-3xl font-extrabold text-primary">65%</span>
-                     </div>
-                   </div>
-                   <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden border border-gray-200 inset-shadow-sm">
-                     <div className="bg-gradient-to-r from-primary to-purple-500 h-full rounded-full transition-all duration-1000 ease-out" style={{ width: '65%' }} />
-                   </div>
-                   <p className="text-xs font-semibold text-gray-500 mt-3 text-right">🔥 목표 달성까지 포트폴리오 1개, 기술 면접 스터디 1개가 더 필요합니다.</p>
-                 </div>
-
-                 <h4 className="font-bold text-gray-900 mb-5 flex items-center gap-2 text-lg">
-                   🎯 현재 목표 달성을 위한 추천 피드
-                 </h4>
-                 
-                 {/* Feed Cards (Expanded Number) */}
-                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {/* Inline Card 1 */}
-                    <div className="bg-white border border-gray-100 p-4 rounded-xl shadow-sm hover:shadow-md transition-shadow flex flex-col">
-                       <span className="text-[10px] font-bold text-orange-600 bg-orange-100 px-2 py-0.5 rounded flex w-fit mb-2">마감 임박</span>
-                       <h5 className="font-bold text-gray-900 text-sm mb-1 leading-tight line-clamp-2">네이버클라우드 캠프 백엔드 심화과정</h5>
-                       <p className="text-xs text-gray-500 mb-4 flex-1">포트폴리오 스펙 +20% 증가 예상</p>
-                       <button className="w-full py-2 bg-gray-50 hover:bg-primary hover:text-white text-gray-600 transition-colors rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 border border-gray-200 hover:border-primary">
-                         <CalendarPlus className="w-3.5 h-3.5" /> 캘린더에 추가
-                       </button>
-                    </div>
-
-                    {/* Inline Card 2 */}
-                    <div className="bg-white border border-gray-100 p-4 rounded-xl shadow-sm hover:shadow-md transition-shadow flex flex-col">
-                       <span className="text-[10px] font-bold text-blue-600 bg-blue-100 px-2 py-0.5 rounded flex w-fit mb-2">상시 스터디</span>
-                       <h5 className="font-bold text-gray-900 text-sm mb-1 leading-tight line-clamp-2">인프런 주최 - 김영한 스프링 JPA 멘토링</h5>
-                       <p className="text-xs text-gray-500 mb-4 flex-1">부족한 기본기 +15% 보완 예상</p>
-                       <button className="w-full py-2 bg-gray-50 hover:bg-primary hover:text-white text-gray-600 transition-colors rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 border border-gray-200 hover:border-primary">
-                         <CalendarPlus className="w-3.5 h-3.5" /> 캘린더에 추가
-                       </button>
-                    </div>
-
-                    {/* Inline Card 3 */}
-                    <div className="bg-white border border-gray-100 p-4 rounded-xl shadow-sm hover:shadow-md transition-shadow flex flex-col">
-                       <span className="text-[10px] font-bold text-green-600 bg-green-100 px-2 py-0.5 rounded flex w-fit mb-2">포트폴리오 빌드</span>
-                       <h5 className="font-bold text-gray-900 text-sm mb-1 leading-tight line-clamp-2">오픈소스 컨트리뷰톤 2026 참가</h5>
-                       <p className="text-xs text-gray-500 mb-4 flex-1">유지보수 및 협업 점수 향상</p>
-                       <button className="w-full py-2 bg-gray-50 hover:bg-primary hover:text-white text-gray-600 transition-colors rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 border border-gray-200 hover:border-primary">
-                         <CalendarPlus className="w-3.5 h-3.5" /> 캘린더에 추가
-                       </button>
-                    </div>
-
-                    {/* Inline Card 4 */}
-                    <div className="bg-white border border-gray-100 p-4 rounded-xl shadow-sm hover:shadow-md transition-shadow flex flex-col">
-                       <span className="text-[10px] font-bold text-purple-600 bg-purple-100 px-2 py-0.5 rounded flex w-fit mb-2">자격증</span>
-                       <h5 className="font-bold text-gray-900 text-sm mb-1 leading-tight line-clamp-2">SQLD 데이터베이스 전문가 시험 일정</h5>
-                       <p className="text-xs text-gray-500 mb-4 flex-1">JPA 기반 성능 최적화 베이스</p>
-                       <button className="w-full py-2 bg-gray-50 hover:bg-primary hover:text-white text-gray-600 transition-colors rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 border border-gray-200 hover:border-primary">
-                         <CalendarPlus className="w-3.5 h-3.5" /> 캘린더에 추가
-                       </button>
-                    </div>
-                 </div>
-
-                 <button className="w-full mt-5 py-2 flex items-center justify-center gap-1 text-sm font-semibold text-primary hover:bg-primary/10 border border-transparent hover:border-primary/20 transition-colors rounded-lg">
-                   더 많은 추천 활동 보기 <ChevronRight className="w-4 h-4" />
-                 </button>
+        {/* RIGHT COLUMN: Detail View Panel */}
+        <div className="lg:col-span-3 p-6 lg:p-8 animate-in slide-in-from-right-4 fade-in duration-300" key={selectedStepIndex}>
+           
+           {/* Detailed Header Group */}
+           <div className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
+              <div>
+                <span className={`text-xs font-bold px-2.5 py-1 rounded-md mb-3 inline-block ${
+                   selectedStep.status === "completed" ? "bg-emerald-100 text-emerald-700" :
+                   selectedStep.status === "current" ? "bg-primary text-white" :
+                   "bg-gray-200 text-gray-600"
+                }`}>
+                  {selectedStep.status === "completed" ? "✅ 달성 완료" : selectedStep.status === "current" ? "🔥 현재 집중 목표" : "🔒 진행 예정 (Locked)"}
+                </span>
+                <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">{selectedStep.title}</h2>
+                <p className="text-sm font-medium text-gray-500 mt-2">이 마일스톤을 달성하여 핵심 역량을 확보하고 다음 단계로 진출하세요.</p>
               </div>
            </div>
-        )}
+
+           {/* Milestone Progress Bar Component */}
+           {selectedStep.status === "current" && (
+             <div className="mb-8 bg-white border border-gray-100 p-6 md:p-8 rounded-2xl shadow-sm">
+               <div className="flex justify-between items-end mb-4">
+                 <div>
+                   <span className="text-xs font-bold text-primary uppercase tracking-widest block mb-1">Target Milestone Progress</span>
+                   <h5 className="font-bold text-gray-900 text-lg">핵심 과제 진행률</h5>
+                 </div>
+                 <div className="text-right">
+                   <span className="text-xs font-bold text-gray-500 mr-2">누적 달성률</span>
+                   <span className="text-4xl font-extrabold text-primary">65<span className="text-xl">%</span></span>
+                 </div>
+               </div>
+               <div className="w-full bg-gray-100 rounded-full h-4 overflow-hidden border border-gray-200 shadow-inner">
+                 <div className="bg-gradient-to-r from-primary via-indigo-500 to-purple-500 h-full rounded-full transition-all duration-1000 ease-out relative" style={{ width: '65%' }}>
+                    <div className="absolute inset-0 bg-white/20 w-full rounded-full animate-pulse" />
+                 </div>
+               </div>
+               <p className="text-sm font-semibold text-gray-600 mt-4 text-right">🔥 해당 목표 달성까지 포트폴리오 <span className="text-primary font-bold">1개</span>, 직무 스터디 <span className="text-primary font-bold">1개</span>가 더 필요합니다.</p>
+             </div>
+           )}
+
+           {/* Sub-Tasks Menu Bar (Expandable) */}
+           {selectedStep.status === "current" && selectedStep.subTasks && selectedStep.subTasks.length > 0 && (
+             <div className="mb-8 border border-gray-200 rounded-2xl overflow-hidden bg-white shadow-sm">
+               <button 
+                 onClick={() => setIsSubTasksExpanded(!isSubTasksExpanded)}
+                 className="w-full p-5 bg-gray-50/80 flex items-center justify-between border-b border-gray-100 transition-colors hover:bg-gray-100/80 focus:outline-none"
+               >
+                 <div className="flex items-center gap-2.5">
+                   <h4 className="font-bold text-gray-900 text-base">상세 태스크 진행 현황</h4>
+                   <span className="text-xs bg-primary text-white font-bold px-2 py-0.5 rounded-full shadow-sm">
+                     {selectedStep.subTasks.filter(t => t.status === "current").length}개 진행 중
+                   </span>
+                 </div>
+                 <div className="flex items-center gap-2 text-sm font-semibold text-gray-500">
+                   {isSubTasksExpanded ? "태스크 줄이기" : "전체 흐름 보기"}
+                   {isSubTasksExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                 </div>
+               </button>
+               
+               <div className="p-3">
+                 <ul className="flex flex-col gap-1">
+                   {selectedStep.subTasks.map((task, idx) => {
+                     const isCurrent = task.status === "current";
+                     const isCompleted = task.status === "completed";
+                     const isPending = task.status === "pending";
+
+                     // If not expanded, only show "current" tasks
+                     if (!isSubTasksExpanded && !isCurrent) return null;
+
+                     return (
+                       <li key={idx} className={`flex items-center gap-3 p-3 rounded-xl transition-all animate-in fade-in slide-in-from-top-2 duration-300 ${isCurrent ? "bg-primary/5 border border-primary/10" : "hover:bg-gray-50"}`}>
+                         <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 border-2 ${
+                           isCompleted ? "border-emerald-500 bg-emerald-500 text-white" : 
+                           isCurrent ? "border-primary bg-white shadow-sm" : "border-gray-200 bg-gray-50"
+                         }`}>
+                           {isCompleted && <CheckCircle2 className="w-3 h-3" />}
+                           {isCurrent && <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />}
+                         </div>
+                         <span className={`font-medium text-sm flex-1 transition-colors ${
+                           isCompleted ? "text-gray-400 line-through decoration-gray-300" :
+                           isCurrent ? "text-primary font-extrabold" : "text-gray-500"
+                         }`}>
+                           {task.title}
+                         </span>
+                         {isCurrent && (
+                           <span className="text-[10px] font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-md">
+                             수행 중
+                           </span>
+                         )}
+                       </li>
+                     );
+                   })}
+                 </ul>
+               </div>
+             </div>
+           )}
+
+           {selectedStep.status === "completed" && (
+             <div className="mb-8 bg-emerald-50/50 border border-emerald-100 p-6 rounded-2xl text-center">
+                <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
+                <h4 className="text-lg font-bold text-emerald-800 mb-1">이미 달성한 마일스톤입니다!</h4>
+                <p className="text-sm text-emerald-600 font-medium">학점 연계 과정을 통해 성공적으로 기초를 다졌습니다.</p>
+             </div>
+           )}
+
+           {selectedStep.status === "pending" && (
+             <div className="mb-8 bg-gray-50 border border-gray-200 border-dashed p-10 rounded-2xl text-center">
+                <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-white shadow-sm">
+                  <span className="text-2xl">🔒</span>
+                </div>
+                <h4 className="text-lg font-bold text-gray-700 mb-2">이전 단계를 먼저 클리어하세요</h4>
+                <p className="text-sm text-gray-500 font-medium">현재 진행 중인 목표를 100% 달성하면 다음 추천 패스웨이가 열립니다.</p>
+             </div>
+           )}
+
+           {/* Recommendation Feed (Mock Content based on Selection) */}
+           {selectedStep.status !== "pending" && (
+             <>
+               <h4 className="font-bold text-gray-900 mb-5 flex items-center gap-2 text-lg border-t border-gray-100 pt-8 mt-2">
+                 🎯 마일스톤 돌파를 위한 추천 액션 (AI Action Plan)
+               </h4>
+               
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Inline Card 1 */}
+                  <div className="bg-white border border-gray-100 p-5 rounded-xl shadow-sm hover:shadow-md transition-shadow flex flex-col group cursor-pointer">
+                     <span className="text-[10px] font-bold text-orange-600 bg-orange-100 px-2.5 py-1 rounded-md flex w-fit mb-3">마감 임박</span>
+                     <h5 className="font-extrabold text-gray-900 text-base mb-2 leading-tight line-clamp-2 group-hover:text-primary transition-colors">네이버클라우드 캠프 백엔드 심화과정</h5>
+                     <p className="text-sm text-gray-500 mb-5 flex-1 font-medium bg-gray-50 p-3 rounded-lg border border-gray-100">&quot;포트폴리오 스펙 20% 증가 예상&quot;</p>
+                     <button className="w-full py-2.5 bg-white hover:bg-primary hover:text-white text-gray-700 transition-colors rounded-lg text-sm font-bold flex items-center justify-center gap-2 border border-gray-200 shadow-sm hover:border-primary">
+                       <CalendarPlus className="w-4 h-4" /> 캘린더에 일정 추가
+                     </button>
+                  </div>
+
+                  {/* Inline Card 2 */}
+                  <div className="bg-white border border-gray-100 p-5 rounded-xl shadow-sm hover:shadow-md transition-shadow flex flex-col group cursor-pointer">
+                     <span className="text-[10px] font-bold text-blue-600 bg-blue-100 px-2.5 py-1 rounded-md flex w-fit mb-3">상시대기 스터디</span>
+                     <h5 className="font-extrabold text-gray-900 text-base mb-2 leading-tight line-clamp-2 group-hover:text-primary transition-colors">인프런 주최 - 스프링 컨퍼런스 참관</h5>
+                     <p className="text-sm text-gray-500 mb-5 flex-1 font-medium bg-gray-50 p-3 rounded-lg border border-gray-100">&quot;부족한 현업 트렌드 시야 보완&quot;</p>
+                     <button className="w-full py-2.5 bg-white hover:bg-primary hover:text-white text-gray-700 transition-colors rounded-lg text-sm font-bold flex items-center justify-center gap-2 border border-gray-200 shadow-sm hover:border-primary">
+                       <CalendarPlus className="w-4 h-4" /> 캘린더에 일정 추가
+                     </button>
+                  </div>
+               </div>
+
+               <button className="w-full mt-6 py-3 flex items-center justify-center gap-1.5 text-sm font-bold text-primary bg-primary/5 hover:bg-primary/10 border border-primary/10 transition-colors rounded-xl">
+                 맞춤형 추천 액션 모두 보기 <ChevronRight className="w-4 h-4" />
+               </button>
+             </>
+           )}
+
+        </div>
       </div>
     </div>
   );
