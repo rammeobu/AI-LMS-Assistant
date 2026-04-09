@@ -11,6 +11,9 @@ export default function Navbar() {
   // Dashboard 진입 시 기본값 처리
   const currentTab = searchParams?.get("tab") || (pathname?.startsWith("/dashboard") ? "dashboard" : "");
 
+  // Hide global navbar on login page to present clean split screen
+  if (pathname === "/login") return null;
+
   const navItems = [
     { id: "dashboard", label: "내 대시보드", icon: LayoutDashboard, href: "/dashboard?tab=dashboard" },
     { id: "feed", label: "추천 활동 피드", icon: Activity, href: "/dashboard?tab=feed" },
@@ -55,7 +58,10 @@ export default function Navbar() {
             })}
           </nav>
           
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-3 lg:space-x-4">
+            <Link href="/login" className="hidden sm:flex items-center justify-center px-4 py-2 text-sm font-bold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors shadow-sm">
+              로그인
+            </Link>
             <Link href="/dashboard?tab=settings">
               <div className={`w-9 h-9 rounded-full border flex items-center justify-center transition-all cursor-pointer ${
                 currentTab === "settings" 

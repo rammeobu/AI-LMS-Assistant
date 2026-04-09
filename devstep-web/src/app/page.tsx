@@ -31,8 +31,8 @@ export default function Home() {
             </p>
             
             <div className="flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start">
-              <Link href="/dashboard" className="w-full sm:w-auto px-8 py-4 bg-primary text-white font-medium rounded-2xl hover:bg-primary/90 transition-all shadow-[0_8px_20px_rgba(85,82,250,0.3)] hover:shadow-[0_8px_25px_rgba(85,82,250,0.4)] flex items-center justify-center gap-2">
-                내 스펙 분석 1분만에 받기 <ArrowRight className="w-5 h-5" />
+              <Link href="/login" className="w-full sm:w-auto px-8 py-4 bg-primary text-white font-medium rounded-2xl hover:bg-primary/90 transition-all shadow-[0_8px_20px_rgba(85,82,250,0.3)] hover:shadow-[0_8px_25px_rgba(85,82,250,0.4)] flex items-center justify-center gap-2">
+                시작하기 <ArrowRight className="w-5 h-5" />
               </Link>
             </div>
           </motion.div>
