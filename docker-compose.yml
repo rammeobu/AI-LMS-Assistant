@@ -1,13 +1,76 @@
-version: '3.8'
-
 services:
+  # ── Frontend: Next.js 16 ──────────────────────
+  devstep-web:
+    build:
+      context: ./devstep-web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    container_name: devstep-web
+    ports:
+      - "3000:3000"
+    env_file: .env
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - devstep-ai
+    restart: unless-stopped
+
+  # ── Backend: FastAPI + AI Worker ──────────────
+  devstep-ai:
+    build:
+      context: ./devstep-ai
+      dockerfile: Dockerfile
+    container_name: devstep-ai
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-devstep}:${POSTGRES_PASSWORD:-devstep_local_2026}@db:5432/${POSTGRES_DB:-devstep_db}
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - ./devstep-ai:/app    # Hot-reload: 코드 변경 즉시 반영
+    restart: unless-stopped
+
+  # ── Database: PostgreSQL 16 + pgvector ────────
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: devstep-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-devstep}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devstep_local_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-devstep_db}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./devstep-ai/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-devstep} -d ${POSTGRES_DB:-devstep_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  # ── Cache / Task Queue: Redis ─────────────────
   redis:
     image: redis:7-alpine
+    container_name: devstep-redis
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes
+    restart: unless-stopped
 
 volumes:
+  pgdata:
+    driver: local
   redis_data:
+    driver: local
