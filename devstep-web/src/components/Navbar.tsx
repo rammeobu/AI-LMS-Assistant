@@ -1,18 +1,36 @@
 "use client";
 
 import Link from "next/link";
-import { User, Activity, Map, Users, LayoutDashboard, Calendar } from "lucide-react";
-import { useSearchParams, usePathname } from "next/navigation";
+import { User, Activity, Map, LayoutDashboard, Calendar, LogOut } from "lucide-react";
+import { useSearchParams, usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { createClient } from "@/utils/supabase/client";
+import { User as SupabaseUser } from "@supabase/supabase-js";
 
 export default function Navbar() {
   const searchParams = useSearchParams();
   const pathname = usePathname();
+  const router = useRouter();
+  const supabase = createClient();
+  const [user, setUser] = useState<SupabaseUser | null>(null);
   
+  // 초기 세션 확인 및 상태 구독
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    getUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase.auth]);
+
   // Dashboard 진입 시 기본값 처리
   const currentTab = searchParams?.get("tab") || (pathname?.startsWith("/dashboard") ? "dashboard" : "");
-
-  // Hide global navbar on login page to present clean split screen
-  if (pathname === "/login") return null;
 
   const navItems = [
     { id: "dashboard", label: "내 대시보드", icon: LayoutDashboard, href: "/dashboard?tab=dashboard" },
@@ -20,6 +38,14 @@ export default function Navbar() {
     { id: "roadmap", label: "직무 로드맵", icon: Map, href: "/dashboard?tab=roadmap" },
     { id: "calendar", label: "스마트 캘린더", icon: Calendar, href: "/dashboard?tab=calendar" },
   ];
+
+  // 로그아웃 핸들러
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    router.refresh();
+    router.push('/');
+  };
 
   return (
     <header className="fixed top-0 w-full z-50 glass border-b border-gray-100/50">
@@ -59,16 +85,31 @@ export default function Navbar() {
           </nav>
           
           <div className="flex items-center space-x-3 lg:space-x-4">
-            <Link href="/login" className="hidden sm:flex items-center justify-center px-4 py-2 text-sm font-bold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors shadow-sm">
-              로그인
-            </Link>
-            <Link href="/dashboard?tab=settings">
+            {user ? (
+              <button 
+                onClick={handleSignOut}
+                className="hidden sm:flex items-center justify-center gap-2 px-4 py-2 text-sm font-bold text-rose-600 bg-rose-50 border border-rose-100 rounded-xl hover:bg-rose-100 transition-colors shadow-sm"
+              >
+                <LogOut className="w-4 h-4" />
+                로그아웃
+              </button>
+            ) : (
+              <Link href="/login" className="hidden sm:flex items-center justify-center px-4 py-2 text-sm font-bold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors shadow-sm">
+                로그인
+              </Link>
+            )}
+            
+            <Link href={user ? "/settings/profile" : "/login"}>
               <div className={`w-9 h-9 rounded-full border flex items-center justify-center transition-all cursor-pointer ${
                 currentTab === "settings" 
                   ? "bg-gray-100/70 border-gray-200/50 text-primary shadow-inner ring-1 ring-gray-200/50 translate-y-[1px]" 
                   : "bg-secondary border-border text-muted-foreground hover:bg-primary/10 hover:text-primary"
               }`}>
-                <User className={`w-5 h-5 ${currentTab === "settings" ? "text-primary" : ""}`} />
+                {user?.user_metadata?.avatar_url ? (
+                  <img src={user.user_metadata.avatar_url} alt="profile" className="w-full h-full rounded-full object-cover" />
+                ) : (
+                  <User className={`w-5 h-5 ${currentTab === "settings" ? "text-primary" : ""}`} />
+                )}
               </div>
             </Link>
           </div>
@@ -77,3 +118,4 @@ export default function Navbar() {
     </header>
   );
 }
+
