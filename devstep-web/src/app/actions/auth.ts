@@ -61,7 +61,7 @@ export async function signInWithEmail(formData: FormData) {
   
   // 온보딩 여부 확인 후 리다이렉트 (이 부분은 미들웨어가 처리하도록 맡기거나 여기서 처리 가능)
   // 현재는 단순 성공 반환
-  return { success: true }
+  return { success: true, message: '' }
 }
 
 export async function signOut() {
