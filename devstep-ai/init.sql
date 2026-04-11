@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS public.activities (
     status          VARCHAR(20) DEFAULT '모집중',
     deadline        TIMESTAMPTZ,
     required_skills JSONB DEFAULT '[]'::jsonb,
-    skill_embedding vector(3072),                           -- Google 3072차원
+    skill_embedding vector(1536),                           -- Google/OpenAI Standard (Max 2000 for indexing)
     source_url      TEXT,
     thumbnail_url   TEXT,
     description     TEXT,
@@ -103,9 +103,11 @@ CREATE TABLE IF NOT EXISTS public.crawling_data (
     target          VARCHAR(100),
     homepage        TEXT,
     description     TEXT,
-    created_at      TIMESTAMPTZ DEFAULT NOW()
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    is_processed    BOOLEAN DEFAULT FALSE,
+    last_error      TEXT
 );
 
 -- 인덱스 및 기타 설정
 CREATE INDEX IF NOT EXISTS idx_onboarding_json ON public.onboarding_surveys USING GIN (survey_data);
-CREATE INDEX IF NOT EXISTS idx_activity_embed ON public.activities USING ivfflat (skill_embedding vector_cosine_ops);
+CREATE INDEX IF NOT EXISTS idx_activity_embed ON public.activities USING hnsw (skill_embedding vector_cosine_ops);

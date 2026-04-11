@@ -1,22 +1,27 @@
 services:
-  # ── Frontend: Next.js 16 ──────────────────────
+  # ── Frontend: Next.js (Hot-reload enabled) ──
   devstep-web:
     build:
       context: ./devstep-web
       dockerfile: Dockerfile
+      target: deps
       args:
-        NEXT_PUBLIC_API_URL: http://localhost:8000
+        - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+        - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
     container_name: devstep-web
     ports:
       - "3000:3000"
-    env_file: .env
+    env_file: ./devstep-web/.env.local
+    volumes:
+      - ./devstep-web:/app
+      - /app/node_modules
+      - /app/.next
     environment:
-      - NODE_ENV=production
-    depends_on:
-      - devstep-ai
+      - NODE_ENV=development
+    command: npm run dev
     restart: unless-stopped
 
-  # ── Backend: FastAPI + AI Worker ──────────────
+  # ── Backend: FastAPI (API) ──
   devstep-ai:
     build:
       context: ./devstep-ai
@@ -24,20 +29,37 @@ services:
     container_name: devstep-ai
     ports:
       - "8000:8000"
-    env_file: .env
-    environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-devstep}:${POSTGRES_PASSWORD:-devstep_local_2026}@db:5432/${POSTGRES_DB:-devstep_db}
-      - REDIS_URL=redis://redis:6379/0
+    env_file: ./devstep-ai/.env
+    volumes:
+      - ./devstep-ai:/app
+      - /app/.venv
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_started
-    volumes:
-      - ./devstep-ai:/app    # Hot-reload: 코드 변경 즉시 반영
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
     restart: unless-stopped
 
-  # ── Database: PostgreSQL 16 + pgvector ────────
+  # ── Backend: Celery Worker ──
+  devstep-worker:
+    build:
+      context: ./devstep-ai
+      dockerfile: Dockerfile
+    container_name: devstep-worker
+    env_file: ./devstep-ai/.env
+    volumes:
+      - ./devstep-ai:/app
+      - /app/.venv
+    depends_on:
+      redis:
+        condition: service_started
+      db:
+        condition: service_healthy
+    command: celery -A app.worker.celery_app worker --loglevel=info
+    restart: unless-stopped
+
+  # ── Database: PostgreSQL 16 + pgvector ──
   db:
     image: pgvector/pgvector:pg16
     container_name: devstep-db
@@ -55,10 +77,9 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-      start_period: 10s
     restart: unless-stopped
 
-  # ── Cache / Task Queue: Redis ─────────────────
+  # ── Redis (Broker) ──
   redis:
     image: redis:7-alpine
     container_name: devstep-redis
@@ -66,11 +87,8 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes
     restart: unless-stopped
 
 volumes:
   pgdata:
-    driver: local
   redis_data:
-    driver: local

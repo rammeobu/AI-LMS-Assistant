@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -33,7 +33,7 @@ import { analyzeGithubStackWithAI, checkGithubToken } from "@/app/actions/github
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 
-export default function UnifiedSurveyPage() {
+function UnifiedSurveyContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [currentStep, setCurrentStep] = useState(1);
@@ -658,5 +658,13 @@ export default function UnifiedSurveyPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function UnifiedSurveyPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center"><Loader2 className="w-10 h-10 text-primary animate-spin" /></div>}>
+      <UnifiedSurveyContent />
+    </Suspense>
   );
 }

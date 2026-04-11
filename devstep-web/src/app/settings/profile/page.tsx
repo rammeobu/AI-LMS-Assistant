@@ -23,7 +23,6 @@ export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
-  const [newSkill, setNewSkill] = useState("");
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -58,25 +57,6 @@ export default function ProfilePage() {
       setSaveStatus('error');
     }
     setIsSaving(false);
-  };
-
-  const addSkill = () => {
-    if (newSkill.trim() && profile && !profile.skills?.includes(newSkill.trim())) {
-      setProfile({
-        ...profile,
-        skills: [...(profile.skills || []), newSkill.trim()]
-      });
-      setNewSkill("");
-    }
-  };
-
-  const removeSkill = (skillToRemove: string) => {
-    if (profile) {
-      setProfile({
-        ...profile,
-        skills: (profile.skills || []).filter(s => s !== skillToRemove)
-      });
-    }
   };
 
   if (isLoading) {

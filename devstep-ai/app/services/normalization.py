@@ -23,7 +23,7 @@ class NormalizationService:
         self._client = genai.Client(api_key=settings.GOOGLE_AI_API_KEY)
         self._norm_model = "gemini-3.1-flash-lite-preview"
         self._embed_model = "gemini-embedding-001"
-        self._dim = 3072
+        self._dim = 1536
 
     async def normalize_and_sync(self, db: AsyncSession, crawled_id: int):
         """

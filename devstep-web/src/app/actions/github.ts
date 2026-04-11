@@ -101,7 +101,7 @@ ${repoContexts.join('\n\n')}
 
     const aiResult = await model.generateContent(prompt)
     const responseText = aiResult.response.text()
-    const jsonMatch = responseText.match(/\[.*\]/s)
+    const jsonMatch = responseText.match(/\[[\s\S]*\]/)
     const skills = jsonMatch ? JSON.parse(jsonMatch[0]) : []
 
     // 5. [중요] 일회성 토큰 정책: 분석 완료 후 토큰 즉시 삭제
@@ -119,7 +119,7 @@ ${repoContexts.join('\n\n')}
   } catch (error: any) {
     console.error('GitHub AI Analysis error:', error)
     // 에러 발생 시에도 보안을 위해 토큰 삭제 시도
-    await supabase.from('users').update({ github_token: null }).eq('id', user.id).catch(() => {})
+    await supabase.from('users').update({ github_token: null }).eq('id', user.id)
     
     return { 
       success: false, 
