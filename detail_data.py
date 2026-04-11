@@ -1,6 +1,6 @@
 import time
 import random
-import pandas as pd
+import json
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 from datetime import datetime
@@ -72,7 +72,7 @@ def _parse_activity(soup: BeautifulSoup, activity_id: int) -> dict | None:
 def crawl_activities(activity_ids: list[int]) -> list[dict]:
     """
     수집된 activity_ids 를 받아 상세 페이지를 파싱한다.
-    결과 list[dict] 를 반환하고 CSV 저장까지 수행한다.
+    결과 list[dict] 를 반환하고 JSON 저장까지 수행한다.
     """
     print(f"\n🔎 상세 크롤링 시작 — 대상 {len(activity_ids)}개")
     all_data: list[dict] = []
@@ -130,14 +130,17 @@ def crawl_activities(activity_ids: list[int]) -> list[dict]:
         finally:
             browser.close()
 
-    # CSV 저장
+    # JSON 저장
     if all_data:
         col_order = ["ID", "수집일시", "기관", "제목", "주제",
                      "전체기간", "대상", "홈페이지", "포스터URL"]
-        df        = pd.DataFrame(all_data)
-        df        = df[[c for c in col_order if c in df.columns]]
-        save_name = f"linkareer_activities_{datetime.now().strftime('%Y%m%d_%H%M')}.csv"
-        df.to_csv(save_name, index=False, encoding="utf-8-sig")
-        print(f"\n🎉 {len(df)}건 → {save_name} 저장 완료")
+        ordered_data = [
+            {k: entry[k] for k in col_order if k in entry}
+            for entry in all_data
+        ]
+        save_name = f"linkareer_activities_{datetime.now().strftime('%Y%m%d_%H%M')}.json"
+        with open(save_name, "w", encoding="utf-8") as f:
+            json.dump(ordered_data, f, ensure_ascii=False, indent=2)
+        print(f"\n🎉 {len(ordered_data)}건 → {save_name} 저장 완료")
 
     return all_data
