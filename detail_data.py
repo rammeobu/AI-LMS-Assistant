@@ -1,6 +1,7 @@
 import time
 import random
 import json
+import re
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 from datetime import datetime
@@ -18,7 +19,6 @@ def _parse_activity(soup: BeautifulSoup, activity_id: int) -> dict | None:
     )
     organization = org_tag.text.strip() if org_tag else "기관명 없음"
 
-    # info 행 파싱
     info: dict[str, str] = {}
     for dt in soup.select("dl dt"):
         dd = dt.find_next_sibling("dd")
@@ -37,9 +37,68 @@ def _parse_activity(soup: BeautifulSoup, activity_id: int) -> dict | None:
         return "정보없음"
 
     subject  = pick(["주제", "분야", "카테고리"])
-    period   = pick(["기간", "접수", "일정", "신청"])
     target   = pick(["대상", "자격", "지원"])
     homepage = pick(["홈페이지", "사이트", "링크", "URL"])
+
+    start_date = "정보없음"
+    end_date   = "정보없음"
+
+    # 파이프(|) 기호 처리를 위해 정규식 패턴 수정
+    for el in soup.find_all(string=re.compile(r"시작일")):
+        parent = el.find_parent()
+        if parent:
+            sibling_text = parent.find_next_sibling()
+            if sibling_text:
+                start_date = sibling_text.get_text(strip=True)
+            else:
+                full = parent.get_text(" ", strip=True)
+                match = re.search(r"시작일\s*[:|\s]+(.+)", full)
+                if match:
+                    start_date = match.group(1).strip()
+
+    for el in soup.find_all(string=re.compile(r"마감일")):
+        parent = el.find_parent()
+        if parent:
+            sibling_text = parent.find_next_sibling()
+            if sibling_text:
+                end_date = sibling_text.get_text(strip=True)
+            else:
+                full = parent.get_text(" ", strip=True)
+                match = re.search(r"마감일\s*[:|\s]+(.+)", full)
+                if match:
+                    end_date = match.group(1).strip()
+
+    if start_date == "정보없음" and end_date == "정보없음":
+        period_raw = pick(["기간", "접수", "일정", "신청"])
+        if period_raw != "정보없음":
+            parts = re.split(r"\s*[~→\-–—]\s*", period_raw, maxsplit=1)
+            start_date = parts[0].strip() if len(parts) >= 1 else "정보없음"
+            end_date   = parts[1].strip() if len(parts) >= 2 else "정보없음"
+
+    detail_content = "정보없음"
+
+    detail_section = (
+        soup.select_one("[class*='TabContent']")
+        or soup.select_one("[class*='tab-content']")
+        or soup.select_one("[class*='DetailContent']")
+        or soup.select_one("[class*='detail-content']")
+        or soup.select_one("[class*='ActivityContent']")
+        or soup.select_one("[class*='activity-content']")
+    )
+    if detail_section:
+        detail_content = detail_section.get_text("\n", strip=True)
+
+    if detail_content == "정보없음":
+        article = soup.select_one("article") or soup.select_one("[class*='description']")
+        if article:
+            detail_content = article.get_text("\n", strip=True)
+
+    if detail_content == "정보없음":
+        for div in soup.select("div"):
+            text = div.get_text("\n", strip=True)
+            if len(text) > 200:
+                detail_content = text
+                break
 
     if homepage == "정보없음":
         for a in soup.select("a[href^='http']"):
@@ -62,10 +121,12 @@ def _parse_activity(soup: BeautifulSoup, activity_id: int) -> dict | None:
         "기관"      : organization,
         "제목"      : title,
         "주제"      : subject,
-        "전체기간"  : period,
+        "시작일"    : start_date,
+        "마감일"    : end_date,
         "대상"      : target,
         "홈페이지"  : homepage,
-        "포스터URL" : img_url or "없음"
+        "포스터URL" : img_url or "없음",
+        "상세내용"  : detail_content,
     }
 
 
@@ -130,10 +191,9 @@ def crawl_activities(activity_ids: list[int]) -> list[dict]:
         finally:
             browser.close()
 
-    # JSON 저장
     if all_data:
         col_order = ["ID", "수집일시", "기관", "제목", "주제",
-                     "전체기간", "대상", "홈페이지", "포스터URL"]
+                     "시작일", "마감일", "대상", "홈페이지", "포스터URL", "상세내용"]
         ordered_data = [
             {k: entry[k] for k in col_order if k in entry}
             for entry in all_data
