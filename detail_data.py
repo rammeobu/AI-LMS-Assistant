@@ -43,7 +43,6 @@ def _parse_activity(soup: BeautifulSoup, activity_id: int) -> dict | None:
     start_date = "정보없음"
     end_date   = "정보없음"
 
-    # 파이프(|) 기호 처리를 위해 정규식 패턴 수정
     for el in soup.find_all(string=re.compile(r"시작일")):
         parent = el.find_parent()
         if parent:
@@ -106,15 +105,6 @@ def _parse_activity(soup: BeautifulSoup, activity_id: int) -> dict | None:
                 homepage = a["href"]
                 break
 
-    img_tag = (
-        soup.select_one("img.activity-image")
-        or soup.select_one("[class*='poster'] img")
-        or soup.select_one("[class*='thumbnail'] img")
-    )
-    img_url = None
-    if img_tag:
-        img_url = img_tag.get("src") or img_tag.get("data-src")
-
     return {
         "ID"        : activity_id,
         "수집일시"  : datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -125,7 +115,6 @@ def _parse_activity(soup: BeautifulSoup, activity_id: int) -> dict | None:
         "마감일"    : end_date,
         "대상"      : target,
         "홈페이지"  : homepage,
-        "포스터URL" : img_url or "없음",
         "상세내용"  : detail_content,
     }
 
@@ -192,8 +181,9 @@ def crawl_activities(activity_ids: list[int]) -> list[dict]:
             browser.close()
 
     if all_data:
+        # 포스터URL이 제거된 컬럼 순서
         col_order = ["ID", "수집일시", "기관", "제목", "주제",
-                     "시작일", "마감일", "대상", "홈페이지", "포스터URL", "상세내용"]
+                     "시작일", "마감일", "대상", "홈페이지", "상세내용"]
         ordered_data = [
             {k: entry[k] for k in col_order if k in entry}
             for entry in all_data
