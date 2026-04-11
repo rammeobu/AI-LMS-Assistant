@@ -49,10 +49,8 @@
 ### ② 스마트 커리어 스테이터스 보드 (Status Hub)
 - **기능 설계**:
   - 활동 피드에서 '찜(Bookmark)'된 아이템들의 마감 기한을 User Calendar DB로 동기화 (Google Calendar OAuth 연동 고려).
-  - **활동 가능 지수 (Availability Index, AIx)** 알고리즘: 학교 별 학사일정(시험, 축제) 크롤링 데이터와 사용자의 현재 진행 프로젝트 가중치를 연산해 "현재 당신의 가용 시간 여력은 O% 입니다" 판별 표시.
 - **주요 API Spec**:
   - `POST /api/v1/calendar/sync` : 캘린더 일정 동기화 및 갱신 API
-  - `GET /api/v1/users/me/availability` : 활동 가능 지수 집계 API
 
 ### ③ 인턴십 합격자 패스파인더 (Roadmap RAG)
 - **기능 설계 (Retrieval-Augmented Generation)**:
@@ -133,7 +131,7 @@ erDiagram
 |-------|---|---|
 | **Phase 1** | 인프라 & 데이터 파이프라인 (2주) | Next.js 초기 세팅 및 Supabase Auth 연동. <br> FastAPI기반 Celery + Redis 크롤러 및 데이터 정규화 적재 모듈 구현 |
 | **Phase 2** | AI 코어 모듈 & RAG 엔진 (2주) | OpenAI API + pgvector 연동. <br> 스펙 정량화(레이더 차트) 프롬프트 작성 및 합격자 포트폴리오 임베딩 구축 |
-| **Phase 3** | 핵심 비즈니스 로직 작성 (2.5주) | Discovery Feed 매칭 로직 완료. <br> Status Hub 레이아웃(학사 캘린더 중첩 렌더) 및 활동 지수 연산 |
+| **Phase 3** | 핵심 비즈니스 로직 작성 (2.5주) | Discovery Feed 매칭 로직 완료. <br> Status Hub 레이아웃(학사 캘린더 중첩 렌더) |
 | **Phase 4** | 팀 빌딩 및 UX 폴리싱 (1.5주) | Team-up 게시판 설계 및 AI 리포트 스냅샷 연동 기능. <br> Framer Motion 적용(부드러운 전환) / QA 및 버그 픽스 |
 
 ---

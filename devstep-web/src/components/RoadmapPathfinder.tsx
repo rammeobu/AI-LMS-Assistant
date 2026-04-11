@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { getAIMatchedActivities } from "@/app/actions/match";
 import { 
   CheckCircle2, 
   ChevronDown, 
@@ -24,6 +25,29 @@ export default function RoadmapPathfinder() {
   const [activeCategory, setActiveCategory] = useState("개발/데이터");
   const [selectedJob, setSelectedJob] = useState("백엔드 엔지니어");
   const [isSubTasksExpanded, setIsSubTasksExpanded] = useState(false);
+
+  // AI Matching States
+  const [aiActivities, setAiActivities] = useState<any[]>([]);
+  const [isAILoading, setIsAILoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  // Fetch AI Matched Activities
+  useEffect(() => {
+    async function fetchAIRecommendations() {
+      setIsAILoading(true);
+      setAiError(null);
+      const { data, error } = await getAIMatchedActivities(selectedJob);
+      
+      if (error) {
+        setAiError(error);
+        setAiActivities([]);
+      } else if (data) {
+        setAiActivities(data.matches || []);
+      }
+      setIsAILoading(false);
+    }
+    fetchAIRecommendations();
+  }, [selectedJob]);
 
   // Mega Menu Data
   const categories = ["개발/데이터", "인프라/보안", "기획/PM", "디자인"];
@@ -335,40 +359,59 @@ export default function RoadmapPathfinder() {
                </div>
              )}
 
-             {/* Recommendation Feed (Mock Content based on Selection) */}
-             {selectedStep.status !== "pending" && (
-               <>
-                 <h4 className="font-bold text-gray-900 mb-5 flex items-center gap-2 text-lg border-t border-gray-100 pt-8 mt-2">
-                   🎯 마일스톤 돌파를 위한 추천 액션 (AI Action Plan)
-                 </h4>
-                 
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Inline Card 1 */}
-                    <div className="bg-white border border-gray-100 p-5 rounded-xl shadow-sm hover:shadow-md transition-shadow flex flex-col group cursor-pointer">
-                       <span className="text-[10px] font-bold text-orange-600 bg-orange-100 px-2.5 py-1 rounded-md flex w-fit mb-3">마감 임박</span>
-                       <h5 className="font-extrabold text-gray-900 text-base mb-2 leading-tight line-clamp-2 group-hover:text-primary transition-colors">네이버클라우드 캠프 백엔드 심화과정</h5>
-                       <p className="text-sm text-gray-500 mb-5 flex-1 font-medium bg-gray-50 p-3 rounded-lg border border-gray-100">&quot;포트폴리오 스펙 20% 증가 예상&quot;</p>
-                       <button className="w-full py-2.5 bg-white hover:bg-primary hover:text-white text-gray-700 transition-colors rounded-lg text-sm font-bold flex items-center justify-center gap-2 border border-gray-200 shadow-sm hover:border-primary">
-                         <CalendarPlus className="w-4 h-4" /> 캘린더에 일정 추가
-                       </button>
+              {/* Recommendation Feed — AI Matched Data */}
+              {selectedStep.status !== "pending" && (
+                <>
+                  <h4 className="font-bold text-gray-900 mb-5 flex items-center gap-2 text-lg border-t border-gray-100 pt-8 mt-2">
+                    <Sparkles className="w-5 h-5 text-primary" />
+                    마일스톤 돌파를 위한 AI 추천 액션
+                  </h4>
+                  
+                  {isAILoading ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {[1, 2].map((i) => (
+                        <div key={i} className="bg-gray-50 border border-gray-100 p-5 rounded-xl h-44 animate-pulse" />
+                      ))}
                     </div>
+                  ) : aiError ? (
+                    <div className="p-10 bg-red-50 text-red-600 rounded-xl text-center text-sm font-medium border border-red-100">
+                      추천 데이터를 가져오지 못했습니다: {aiError}
+                    </div>
+                  ) : aiActivities.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {aiActivities.map((activity: any) => (
+                        <div key={activity.activity_id} className="bg-white border border-gray-100 p-5 rounded-xl shadow-sm hover:shadow-md transition-shadow flex flex-col group cursor-pointer relative overflow-hidden">
+                           <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
+                              <Sparkles className="w-12 h-12 text-primary" />
+                           </div>
+                           <div className="flex justify-between items-start mb-3">
+                             <span className="text-[10px] font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-md">
+                               AI 매칭률 {activity.score}%
+                             </span>
+                           </div>
+                           <h5 className="font-extrabold text-gray-900 text-base mb-2 leading-tight line-clamp-2 group-hover:text-primary transition-colors">
+                             {activity.title}
+                           </h5>
+                           <p className="text-xs text-gray-500 mb-5 flex-1 font-medium bg-gray-50 p-3 rounded-lg border border-gray-100 line-clamp-3">
+                             {activity.reason}
+                           </p>
+                           <button className="w-full py-2.5 bg-white hover:bg-primary hover:text-white text-gray-700 transition-colors rounded-lg text-sm font-bold flex items-center justify-center gap-2 border border-gray-200 shadow-sm hover:border-primary">
+                             <CalendarPlus className="w-4 h-4" /> 캘린더에 일정 추가
+                           </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-10 bg-gray-50 text-gray-400 rounded-xl text-center text-sm font-medium border border-gray-100 border-dashed">
+                      유효한 추천 활동이 없습니다. 온보딩 정보를 업데이트해 보세요.
+                    </div>
+                  )}
 
-                  {/* Inline Card 2 */}
-                  <div className="bg-white border border-gray-100 p-5 rounded-xl shadow-sm hover:shadow-md transition-shadow flex flex-col group cursor-pointer">
-                     <span className="text-[10px] font-bold text-blue-600 bg-blue-100 px-2.5 py-1 rounded-md flex w-fit mb-3">상시대기 스터디</span>
-                     <h5 className="font-extrabold text-gray-900 text-base mb-2 leading-tight line-clamp-2 group-hover:text-primary transition-colors">인프런 주최 - 스프링 컨퍼런스 참관</h5>
-                     <p className="text-sm text-gray-500 mb-5 flex-1 font-medium bg-gray-50 p-3 rounded-lg border border-gray-100">&quot;부족한 현업 트렌드 시야 보완&quot;</p>
-                     <button className="w-full py-2.5 bg-white hover:bg-primary hover:text-white text-gray-700 transition-colors rounded-lg text-sm font-bold flex items-center justify-center gap-2 border border-gray-200 shadow-sm hover:border-primary">
-                       <CalendarPlus className="w-4 h-4" /> 캘린더에 일정 추가
-                     </button>
-                  </div>
-               </div>
-
-               <button className="w-full mt-6 py-3 flex items-center justify-center gap-1.5 text-sm font-bold text-primary bg-primary/5 hover:bg-primary/10 border border-primary/10 transition-colors rounded-xl">
-                 맞춤형 추천 액션 모두 보기 <ChevronRight className="w-4 h-4" />
-               </button>
-             </>
-           )}
+                  <button className="w-full mt-6 py-3 flex items-center justify-center gap-1.5 text-sm font-bold text-primary bg-primary/5 hover:bg-primary/10 border border-primary/10 transition-colors rounded-xl">
+                    맞춤형 추천 액션 모두 보기 <ChevronRight className="w-4 h-4" />
+                  </button>
+                </>
+              )}
 
         </div>
       </div>

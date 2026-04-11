@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -28,36 +28,203 @@ import {
   TrendingUp,
   Layout
 } from "lucide-react";
+import { completeUnifiedOnboarding, getOnboardingSurvey } from "@/app/actions/user";
+import { analyzeGithubStackWithAI, checkGithubToken } from "@/app/actions/github";
+import { useSearchParams } from "next/navigation";
+import { createClient } from "@/utils/supabase/client";
 
 export default function UnifiedSurveyPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [currentStep, setCurrentStep] = useState(1);
   const [isScanning, setIsScanning] = useState(false);
+  const [isScanCompleted, setIsScanCompleted] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   
   // Point A + Point B 통합 데이터 상태
   const [surveyData, setSurveyData] = useState({
     // Point A Fields
-    skills: ["Python", "FastAPI", "React", "PostgreSQL"],
-    baseline: "3학년 (전공 심화)",
-    status: ["알고리즘/코테 준비", "사이드 프로젝트 진행 중"],
-    experience: "Lv.2 외부 데이터 연동",
+    skills: [] as string[],
+    baseline: "",
+    status: [] as string[],
+    experience: "",
     interests: [] as string[],
     
     // Point B Fields
-    careerGaps: [] as string[], // Step 5: 이력서 결핍
-    targetDomain: [] as string[], // Step 6: 타겟 도메인
-    availableResource: "미들형", // Step 7: 가용 리소스
-    freeIdea: "" // Step 8: 자유 아이디어
+    careerGaps: [] as string[], 
+    targetDomain: [] as string[], 
+    availableResource: "미들형", 
+    freeIdea: "" 
   });
 
-  const handleFinishSurvey = () => {
-    setIsFinished(true);
-    // 실제 환경에서는 여기서 DB 업데이트 (서버 액션 호출)를 진행합니다.
-    setTimeout(() => {
-      router.push("/dashboard?tab=roadmap");
-    }, 2500);
+  // 기존 데이터 불러오기 (Pre-fill) 및 자동 스캔 체크
+  useEffect(() => {
+    const initSurvey = async () => {
+      try {
+        const { data, error } = await getOnboardingSurvey();
+        if (data) {
+          setSurveyData({
+            skills: data.point_a?.current_skills || [],
+            baseline: data.point_a?.academic_year || "",
+            status: data.point_a?.current_focus || [],
+            experience: data.point_a?.experience_level || "",
+            interests: data.point_a?.interests || [],
+            careerGaps: data.point_b?.career_gaps || [],
+            targetDomain: data.point_b?.target_domains || [],
+            availableResource: data.point_b?.availability_resource || "미들형",
+            freeIdea: data.point_b?.free_idea || ""
+          });
+        }
+
+        // URL 파라미터에 scan=true가 있으면 자동 분석 시작
+        if (searchParams?.get('scan') === 'true') {
+          // 주소창에서 파라미터 즉시 제거 (새로고침 시 재실행 방지)
+          const url = new URL(window.location.href);
+          url.searchParams.delete('scan');
+          window.history.replaceState({}, '', url.pathname + url.search);
+          
+          handleGithubScan();
+        }
+      } catch (err) {
+        console.error("Failed to load existing survey:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    initSurvey();
+  }, [searchParams]);
+
+  const handleGithubScan = async () => {
+    setIsScanning(true);
+    try {
+      // 1. 먼저 DB에 토큰이 있는지 확인 (리다이렉트 최소화)
+      const tokenStatus = await checkGithubToken();
+      
+      if (!tokenStatus.success) {
+        // 토큰이 없으면 OAuth 유도
+        const supabase = createClient();
+        await supabase.auth.signInWithOAuth({
+          provider: 'github',
+          options: {
+            redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent('/setup/point-a?scan=true')}`,
+            scopes: 'read:user repo'
+          }
+        });
+        return; // 리다이렉트되므로 아래 로직 실행 안 함
+      }
+
+      // 2. 토큰이 있으면 바로 AI 분석 실행
+      const result = await analyzeGithubStackWithAI();
+      if (result.success && result.skills) {
+        const combinedSkills = Array.from(new Set([...surveyData.skills, ...result.skills]));
+        setSurveyData(prev => ({ ...prev, skills: combinedSkills }));
+        setIsScanCompleted(true);
+        alert(result.message);
+      } else {
+        alert(result.error || "분석 중 오류가 발생했습니다.");
+      }
+    } catch (err: any) {
+      alert(err.message || "분석 중 오류가 발생했습니다.");
+    } finally {
+      setIsScanning(false);
+    }
   };
+
+  const handleNextStep = () => {
+    let isValid = false;
+    let message = "옵션을 선택해 주세요.";
+
+    switch (currentStep) {
+      case 1:
+        isValid = surveyData.skills.length > 0;
+        message = "최소 하나 이상의 기술 스택을 선택하거나 추출해 주세요.";
+        break;
+      case 2:
+        isValid = surveyData.baseline !== "" && surveyData.status.length > 0;
+        message = "학년/과정 및 활동 정보를 모두 선택해 주세요.";
+        break;
+      case 3:
+        isValid = surveyData.experience !== "";
+        message = "경험치 레벨을 선택해 주세요.";
+        break;
+      case 4:
+        isValid = surveyData.interests.length > 0;
+        message = "관심 분야를 하나 이상 선택해 주세요.";
+        break;
+      case 5:
+        isValid = surveyData.careerGaps.length > 0;
+        message = "채우고 싶은 결핍을 선택해 주세요.";
+        break;
+      case 6:
+        isValid = surveyData.targetDomain.length > 0;
+        message = "타겟 도메인을 선택해 주세요.";
+        break;
+      case 7:
+        isValid = surveyData.availableResource !== "";
+        break;
+      case 8:
+        isValid = surveyData.freeIdea.trim().length > 0;
+        message = "아이디어를 입력해 주세요. (없다면 건너뛰기를 눌러주세요)";
+        break;
+      default:
+        isValid = true;
+    }
+
+    if (!isValid) {
+      alert(message);
+      return;
+    }
+
+    if (currentStep < 8) {
+      setCurrentStep(curr => curr + 1);
+    } else {
+      handleFinishSurvey();
+    }
+  };
+
+  const isStepValid = () => {
+    switch (currentStep) {
+      case 1: return surveyData.skills.length > 0;
+      case 2: return surveyData.baseline !== "" && surveyData.status.length > 0;
+      case 3: return surveyData.experience !== "";
+      case 4: return surveyData.interests.length > 0;
+      case 5: return surveyData.careerGaps.length > 0;
+      case 6: return surveyData.targetDomain.length > 0;
+      case 7: return surveyData.availableResource !== "";
+      case 8: return surveyData.freeIdea.trim().length > 0;
+      default: return true;
+    }
+  };
+
+  const handleFinishSurvey = async () => {
+    setIsSubmitting(true);
+    try {
+      const result = await completeUnifiedOnboarding(surveyData);
+      if (result.success) {
+        setIsFinished(true);
+        setTimeout(() => {
+          router.push("/dashboard?tab=roadmap");
+        }, 2500);
+      }
+    } catch (error) {
+      console.error("Survey submission failed:", error);
+      alert("데이터 저장 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-center">
+        <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
+        <h2 className="text-xl font-bold text-gray-900 mb-2">기존 진단 데이터를 불러오는 중...</h2>
+        <p className="text-gray-500">잠시만 기다려 주세요.</p>
+      </div>
+    );
+  }
 
   if (isFinished) {
     return (
@@ -141,24 +308,31 @@ export default function UnifiedSurveyPage() {
                     </div>
                   </div>
                   <div className="bg-gray-50 rounded-3xl p-10 border border-gray-100 flex flex-col items-center justify-center min-h-[300px] relative overflow-hidden">
-                    {!isScanning ? (
-                      <button onClick={() => { setIsScanning(true); setTimeout(() => setIsScanning(false), 2000); }} className="px-10 py-5 bg-gray-900 text-white rounded-[24px] font-bold flex items-center gap-3 hover:bg-black transition-all shadow-2xl active:scale-95 group">
-                        <Terminal className="w-6 h-6 group-hover:animate-pulse" /> 깃허브 연동 및 스택 추출하기
-                      </button>
-                    ) : (
+                    {isScanCompleted ? (
+                      <div className="px-10 py-5 bg-emerald-50 text-emerald-600 rounded-[24px] font-bold flex items-center gap-3 border-2 border-emerald-100 shadow-sm animate-in fade-in zoom-in-95 duration-500">
+                        <CheckCircle2 className="w-6 h-6" /> 스택 추출 및 자동 입력 완료
+                      </div>
+                    ) : isScanning ? (
                       <div className="flex flex-col items-center gap-6">
                         <Loader2 className="w-16 h-16 text-primary animate-spin" />
                         <div className="text-center">
-                          <p className="text-gray-900 text-xl font-black animate-pulse">레포지토리 분석 중...</p>
-                          <p className="text-gray-400 text-sm font-bold mt-1">당신의 코드를 읽고 있습니다.</p>
+                          <p className="text-gray-900 text-xl font-black animate-pulse">Gemini AI가 전체 레포지토리 분석 중...</p>
+                          <p className="text-gray-400 text-sm font-bold mt-1">모든 프로젝트와 README를 읽고 있습니다.</p>
                         </div>
                       </div>
+                    ) : (
+                      <button 
+                        onClick={handleGithubScan} 
+                        className="px-10 py-5 bg-gray-900 text-white rounded-[24px] font-bold flex items-center gap-3 hover:bg-black transition-all shadow-2xl active:scale-95 group"
+                      >
+                        <Terminal className="w-6 h-6 group-hover:animate-pulse" /> 깃허브 AI 분석으로 스택 추출하기
+                      </button>
                     )}
-                    {!isScanning && surveyData.skills.length > 0 && (
+                    {!isScanning && (
                       <div className="mt-4 text-center animate-in fade-in zoom-in-95 duration-700">
-                        <p className="text-xs font-bold text-gray-400 mb-6 uppercase tracking-[0.2em]">추출된 주요 키워드</p>
+                        <p className="text-xs font-bold text-gray-400 mb-6 uppercase tracking-[0.2em]">보유 기술 스택 (자동 추출 및 직접 선택)</p>
                         <div className="flex flex-wrap justify-center gap-3 max-w-lg">
-                          {["Python", "FastAPI", "MySQL", "React", "Next.js", "TypeScript", "Spring"].map((skill) => {
+                          {["React", "Next.js", "TypeScript", "Python", "FastAPI", "Spring Boot", "Go", "Docker", "AWS", "PostgreSQL"].map((skill) => {
                             const isActive = surveyData.skills.includes(skill);
                             return (
                               <button key={skill} onClick={() => { setSurveyData(prev => ({ ...prev, skills: isActive ? prev.skills.filter(s => s !== skill) : [...prev.skills, skill] })); }}
@@ -167,6 +341,13 @@ export default function UnifiedSurveyPage() {
                               </button>
                             );
                           })}
+                          {/* AI로만 추출된 새로운 기술이 있다면 추가로 보여줌 */}
+                          {surveyData.skills.filter(s => !["React", "Next.js", "TypeScript", "Python", "FastAPI", "Spring Boot", "Go", "Docker", "AWS", "PostgreSQL"].includes(s)).map(skill => (
+                            <button key={skill} onClick={() => { setSurveyData(prev => ({ ...prev, skills: prev.skills.filter(s => s !== skill) })); }}
+                              className="px-5 py-2.5 rounded-2xl text-sm font-black bg-primary border-primary text-white shadow-lg shadow-primary/20 border-2">
+                              {skill}
+                            </button>
+                          ))}
                           <button className="px-5 py-2.5 rounded-2xl text-sm font-black border-2 border-dashed border-gray-200 text-gray-300 flex items-center gap-1.5 hover:border-gray-400 hover:text-gray-500 transition-all">
                             <Plus className="w-4 h-4" /> 직접 추가
                           </button>
@@ -461,16 +642,15 @@ export default function UnifiedSurveyPage() {
                   </button>
                 )}
                 <button 
-                  onClick={() => {
-                    if (currentStep < 8) setCurrentStep(curr => curr + 1);
-                    else handleFinishSurvey();
-                  }}
-                  className={`px-12 py-5 rounded-[24px] font-black text-lg shadow-2xl flex items-center gap-3 hover:scale-[1.02] active:scale-95 transition-all text-white ${
-                    isPhaseA ? "bg-primary shadow-primary/10" : "bg-purple-600 shadow-purple-200"
+                  onClick={handleNextStep}
+                  className={`px-12 py-5 rounded-[24px] font-black text-lg shadow-2xl flex items-center gap-3 transition-all ${
+                    isStepValid()
+                      ? (isPhaseA ? "bg-primary shadow-primary/10 hover:scale-[1.02] active:scale-95 text-white" : "bg-purple-600 shadow-purple-200 hover:scale-[1.02] active:scale-95 text-white")
+                      : "bg-gray-200 text-gray-400 cursor-not-allowed shadow-none"
                   }`}
                 >
                   {currentStep === 8 ? "진단 완료 및 로드맵 생성" : "다음 단계로"}
-                  <ArrowRight className="w-6 h-6" />
+                  <ArrowRight className={`w-6 h-6 ${isStepValid() ? "group-hover:translate-x-1" : ""}`} />
                 </button>
               </div>
             </div>

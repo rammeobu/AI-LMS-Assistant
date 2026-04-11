@@ -10,12 +10,20 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = await createClient()
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    const { data: { session }, error } = await supabase.auth.exchangeCodeForSession(code)
     
-    if (!error) {
-      // 1. Check if user is already in our custom 'users' table and onboarded
-      const { data: { user } } = await supabase.auth.getUser()
+    if (!error && session) {
+      const { user } = session
       
+      // 1. GitHub provider_token 추출 및 저장
+      if (session.provider_token) {
+        await supabase
+          .from('users')
+          .update({ github_token: session.provider_token })
+          .eq('id', user.id)
+      }
+
+      // 2. 온보딩 여부 확인 및 리다이렉트 처리
       if (user) {
         const { data: userData, error: dbError } = await supabase
           .from('users')
@@ -23,11 +31,7 @@ export async function GET(request: Request) {
           .eq('id', user.id)
           .single()
 
-        // 2. If user doesn't exist in our table or hasn't finished onboarding
         if (dbError || !userData?.is_onboarded) {
-          // If totally missing, create a base record (upsert handles updates if it somehow existed)
-          // 트리거 덕분에 데이터가 반드시 존재해야 하지만, 
-          // 만약 없거나 온보딩이 안 된 경우 무조건 온보딩으로 보냅니다.
           return NextResponse.redirect(`${origin}/onboarding`)
         }
       }

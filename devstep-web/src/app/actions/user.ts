@@ -29,9 +29,37 @@ export async function getUserProfile(): Promise<{ data: UserProfile | null; erro
 }
 
 /**
- * 유저 프로필 정보를 업데이트합니다. (범용 수정용)
+ * 기존 온보딩 상세 진단 데이터를 가져옵니다. (Pre-fill용)
  */
-export async function updateUserProfile(input: UserUpdateInput) {
+export async function getOnboardingSurvey(): Promise<{ data: any | null; error: string | null }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { data: null, error: '인증된 유저가 아닙니다.' }
+  }
+
+  const { data, error } = await supabase
+    .from('onboarding_surveys')
+    .select('survey_data')
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (error) {
+    return { data: null, error: error.message }
+  }
+
+  return { data: data?.survey_data || null, error: null }
+}
+
+/**
+ * 유저 프로필 정보를 업데이트합니다. (Minimal Profile)
+ * 오직 users 테이블의 기본 컬럼(name, avatar_url)만 처리합니다.
+ */
+export async function updateUserProfile(input: {
+  name?: string | null;
+  avatar_url?: string | null;
+}) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -42,7 +70,8 @@ export async function updateUserProfile(input: UserUpdateInput) {
   const { error } = await supabase
     .from('users')
     .update({
-      ...input,
+      name: input.name,
+      avatar_url: input.avatar_url,
       updated_at: new Date().toISOString(),
     })
     .eq('id', user.id)
@@ -57,41 +86,90 @@ export async function updateUserProfile(input: UserUpdateInput) {
 }
 
 /**
- * 온보딩 정보를 완료 처리합니다.
+ * 온보딩 및 상세 조사 데이터를 완료 처리합니다. (JSON 테이블 저장 방식)
  */
-export async function completeOnboarding(formData: {
-  name: string
-  major: string
-  status: string
-  interest_role: string
-  skills: string[]
+export async function completeUnifiedOnboarding(formData: {
+  name?: string
+  region?: string
+  skills?: string[]
+  baseline?: string
+  status?: string[]
+  experience?: string
+  interests?: string[]
+  careerGaps?: string[]
+  targetDomain?: string[]
+  availableResource?: string
+  freeIdea?: string
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    throw new Error('User not found')
+    throw new Error('인증된 유저가 아닙니다.')
   }
 
-  // 이제 트리거가 유저 행을 생성해두었으므로 upsert 대신 update를 사용해도 안전합니다.
-  const { error } = await supabase
+  // 1. AI 전용 설문 데이터 테이블에 JSON으로 저장 (Upsert)
+  const { error: surveyError } = await supabase
+    .from('onboarding_surveys')
+    .upsert({
+      user_id: user.id,
+      survey_data: {
+        profile: {
+          name: formData.name,
+          region: formData.region,
+        },
+        point_a: {
+          current_skills: formData.skills || [],
+          academic_year: formData.baseline || "",
+          current_focus: formData.status || [],
+          experience_level: formData.experience || "",
+          interests: formData.interests || []
+        },
+        point_b: {
+          career_gaps: formData.careerGaps || [],
+          target_domains: formData.targetDomain || [],
+          availability_resource: formData.availableResource || "미들형",
+          free_idea: formData.freeIdea || ""
+        }
+      },
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'user_id' });
+
+  if (surveyError) {
+    console.error('Survey save error:', surveyError.message)
+    throw new Error('상세 진단 정보 저장 실패')
+  }
+
+  // 2. 포트폴리오 기술 스택 동기화 (기술 정보가 있을 경우만)
+  if (formData.skills && formData.skills.length > 0) {
+    const { error: portfolioError } = await supabase
+      .from('portfolio')
+      .upsert({
+        user_id: user.id,
+        tech_stacks: formData.skills,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id' });
+
+    if (portfolioError) {
+      console.warn('Portfolio sync warning:', portfolioError.message)
+    }
+  }
+
+  // 3. 메인 유저 테이블 온보딩 완료 플래그 및 이름 업데이트
+  const updateData: any = { 
+    is_onboarded: true,
+    updated_at: new Date().toISOString() 
+  }
+  if (formData.name) updateData.name = formData.name
+
+  const { error: userError } = await supabase
     .from('users')
-    .update({
-      name: formData.name,
-      major: formData.major,
-      status: formData.status,
-      interest_role: formData.interest_role,
-      skills: formData.skills,
-      is_onboarded: true,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updateData)
     .eq('id', user.id)
 
-  if (error) {
-    console.error('Onboarding update error:', error.message)
-    // 여전히 백엔드 미준비 상황을 대비해 성공으로 처리할 수도 있으나, 
-    // 이제 트리거를 통해 구조가 잡혔으므로 엄격하게 처리하는 것이 좋습니다.
-    throw new Error('온보딩 정보를 저장하는 데 실패했습니다.')
+  if (userError) {
+    console.error('Onboarding update error:', userError.message)
+    throw new Error('온보딩 완료 처리 실패')
   }
 
   revalidatePath('/', 'layout')

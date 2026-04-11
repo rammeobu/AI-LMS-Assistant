@@ -6,16 +6,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   User, 
   Mail, 
-  Briefcase, 
-  GraduationCap, 
-  Code2, 
   Save, 
   ArrowLeft,
-  X,
-  Plus,
+  ArrowRight,
   Loader2,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Sparkles
 } from "lucide-react";
 import { getUserProfile, updateUserProfile } from "@/app/actions/user";
 import { UserProfile } from "@/types/user";
@@ -51,10 +48,7 @@ export default function ProfilePage() {
 
     const result = await updateUserProfile({
       name: profile.name,
-      major: profile.major,
-      status: profile.status,
-      interest_role: profile.interest_role,
-      skills: profile.skills,
+      avatar_url: profile.avatar_url,
     });
 
     if (result.success) {
@@ -134,166 +128,102 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            <form onSubmit={handleSave} className="space-y-8">
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Name Input */}
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2 px-1">
-                    <User className="w-3 h-3" /> 이름
-                  </label>
-                  <input 
-                    type="text"
-                    value={profile?.name || ""}
-                    onChange={(e) => setProfile(prev => prev ? {...prev, name: e.target.value} : null)}
-                    className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all font-medium text-gray-800"
-                    placeholder="이름을 입력하세요"
-                  />
+            <div className="space-y-12">
+              {/* Account Settings Section */}
+              <section className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <User className="w-5 h-5 text-primary" /> 기본 계정 정보
+                  </h2>
                 </div>
-
-                {/* Major Input */}
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2 px-1">
-                    <GraduationCap className="w-3 h-3" /> 전공
-                  </label>
-                  <input 
-                    type="text"
-                    value={profile?.major || ""}
-                    onChange={(e) => setProfile(prev => prev ? {...prev, major: e.target.value} : null)}
-                    className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all font-medium text-gray-800"
-                    placeholder="예: 컴퓨터공학"
-                  />
-                </div>
-
-                {/* Status Select */}
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2 px-1">
-                    <CheckCircle2 className="w-3 h-3" /> 현재 상태
-                  </label>
-                  <select 
-                    value={profile?.status || ""}
-                    onChange={(e) => setProfile(prev => prev ? {...prev, status: e.target.value} : null)}
-                    className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all font-medium text-gray-800 appearance-none"
-                  >
-                    <option value="student">재학생</option>
-                    <option value="graduate">졸업예정자/졸업생</option>
-                    <option value="jobseeker">취업 준비 중</option>
-                    <option value="junior">주니어 직장인</option>
-                  </select>
-                </div>
-
-                {/* Interest Role */}
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2 px-1">
-                    <Briefcase className="w-3 h-3" /> 관심 직무
-                  </label>
-                  <input 
-                    type="text"
-                    value={profile?.interest_role || ""}
-                    onChange={(e) => setProfile(prev => prev ? {...prev, interest_role: e.target.value} : null)}
-                    className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all font-medium text-gray-800"
-                    placeholder="예: 백엔드 개발자"
-                  />
-                </div>
-              </div>
-
-              {/* Skills Section */}
-              <div className="space-y-4 pt-4">
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2 px-1">
-                  <Code2 className="w-3 h-3" /> 보유 기술 스택
-                </label>
                 
-                <div className="flex flex-wrap gap-2 mb-4">
-                  <AnimatePresence>
-                    {profile?.skills?.map((skill) => (
-                      <motion.span
-                        key={skill}
-                        initial={{ scale: 0.8, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.8, opacity: 0 }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/5 text-primary rounded-xl text-sm font-bold border border-primary/10 group active:scale-95 transition-transform"
-                      >
-                        {skill}
-                        <button 
-                          type="button"
-                          onClick={() => removeSkill(skill)}
-                          className="p-0.5 hover:bg-primary/10 rounded-full transition-colors"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </motion.span>
-                    ))}
-                  </AnimatePresence>
-                  
-                  <div className="relative inline-flex items-center">
-                    <input 
-                      type="text"
-                      value={newSkill}
-                      onChange={(e) => setNewSkill(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          addSkill();
-                        }
-                      }}
-                      placeholder="기술 추가 (예: React, Node.js)"
-                      className="px-3 py-1.5 bg-white border border-dashed border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all w-48"
-                    />
+                <form onSubmit={handleSave} className="space-y-6 bg-gray-50/50 p-6 rounded-3xl border border-gray-100">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Nickname Input */}
+                    <div className="space-y-4">
+                      <label className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-widest px-1">
+                        <User className="w-4 h-4" /> 닉네임
+                      </label>
+                      <input 
+                        type="text"
+                        value={profile?.name || ""}
+                        onChange={(e) => setProfile(prev => prev ? {...prev, name: e.target.value} : null)}
+                        placeholder="활동할 닉네임을 입력하세요"
+                        className="w-full bg-white border border-gray-100 rounded-2xl p-4 focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all font-bold text-gray-900"
+                      />
+                    </div>
+
+                    {/* Email (Readonly) */}
+                    <div className="space-y-2 opacity-60">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest px-1">
+                        이메일 (변경 불가)
+                      </label>
+                      <div className="w-full px-5 py-4 bg-gray-100 border border-gray-100 rounded-2xl font-medium text-gray-500 flex items-center gap-2">
+                        <Mail className="w-4 h-4" />
+                        {profile?.email}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end pt-2">
                     <button 
-                      type="button"
-                      onClick={addSkill}
-                      className="absolute right-2 p-1 text-gray-400 hover:text-primary transition-colors"
+                      type="submit"
+                      disabled={isSaving}
+                      className="px-8 py-3.5 bg-gray-900 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-black transition-all disabled:opacity-50"
                     >
-                      <Plus className="w-4 h-4" />
+                      {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      변경사항 저장
+                    </button>
+                  </div>
+                </form>
+              </section>
+
+              {/* Career Diagnostic Section */}
+              <section className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-amber-500" /> 커리어 정밀 진단 데이터
+                  </h2>
+                </div>
+
+                <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-[32px] p-8 text-white relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-primary/20 blur-[100px] -mr-32 -mt-32" />
+                  <div className="relative z-10">
+                    <h3 className="text-xl font-bold mb-3">상세 진단 정보 관리를 원하시나요?</h3>
+                    <p className="text-gray-400 text-sm leading-relaxed mb-8 max-w-md">
+                      전공, 핵심 기술, 지향하는 커리어 도메인 등 분석에 필요한 데이터는 
+                      정밀 진단 프로세스를 통해 더욱 정교하게 업데이트할 수 있습니다. 
+                      기존 데이터를 유지한 채로 수정이 가능합니다.
+                    </p>
+                    
+                    <button 
+                      onClick={() => router.push("/setup/point-a")}
+                      className="flex items-center gap-3 px-6 py-4 bg-white text-gray-900 rounded-2xl font-bold hover:bg-primary hover:text-white transition-all group/btn"
+                    >
+                      커리어 정밀 진단 수정하기
+                      <ArrowRight className="w-5 h-5 group-hover/btn:translate-x-1 transition-transform" />
                     </button>
                   </div>
                 </div>
-              </div>
+              </section>
 
-              {/* Submit / Feedback */}
-              <div className="pt-8 border-t border-gray-50 flex flex-col md:flex-row items-center justify-between gap-6">
-                <div className="flex items-center gap-3">
-                  <AnimatePresence mode="wait">
-                    {saveStatus === 'success' && (
-                      <motion.div 
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0 }}
-                        className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-4 py-2 rounded-xl text-sm font-bold"
-                      >
-                        <CheckCircle2 className="w-4 h-4" /> 성공적으로 저장되었습니다.
-                      </motion.div>
-                    )}
-                    {saveStatus === 'error' && (
-                      <motion.div 
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0 }}
-                        className="flex items-center gap-2 text-rose-600 bg-rose-50 px-4 py-2 rounded-xl text-sm font-bold"
-                      >
-                        <AlertCircle className="w-4 h-4" /> 저장에 실패했습니다. 다시 시도해주세요.
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-
-                <button 
-                  type="submit"
-                  disabled={isSaving}
-                  className="w-full md:w-auto px-10 py-4 bg-gray-900 text-white rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-black transition-all shadow-xl shadow-gray-200 disabled:opacity-70 group"
-                >
-                  {isSaving ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <>
-                      프로필 저장하기
-                      <Save className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                    </>
-                  )}
-                </button>
-              </div>
-
-            </form>
+              {/* Feedback Toast */}
+              <AnimatePresence>
+                {saveStatus !== 'idle' && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
+                    className={`fixed bottom-10 left-1/2 -translate-x-1/2 px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 font-bold z-50 ${
+                      saveStatus === 'success' ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'
+                    }`}
+                  >
+                    {saveStatus === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
+                    {saveStatus === 'success' ? '프로필이 성공적으로 업데이트되었습니다.' : '저장에 실패했습니다. 다시 시도해주세요.'}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </motion.div>
 
