@@ -10,7 +10,7 @@ if __name__ == "__main__":
         print(f"\n{'='*40}")
         print("🚀 1단계: ID 수집")
         ids = collect_activity_ids()
-        ids = ids[:1]
+        #ids = ids[:1]
         # 수집된 ID가 있을 때만 2~3단계 진행
         if ids:
             print(f"\n{'='*40}")
