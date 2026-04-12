@@ -21,16 +21,7 @@ class Settings(BaseSettings):
     )
 
     # ── Database (PostgreSQL / Supabase) ──
-    DB_MODE: str = "local"
-    LOCAL_DATABASE_URL: str = "postgresql://devstep:devstep_local_2026@db:5432/devstep_db"
-    SUPABASE_DATABASE_URL: str = ""
-
-    @property
-    def DATABASE_URL(self) -> str:
-        """DB_MODE에 따라 적절한 커넥션 스트링 반환"""
-        if self.DB_MODE.lower() == "supabase":
-            return self.SUPABASE_DATABASE_URL
-        return self.LOCAL_DATABASE_URL
+    DATABASE_URL: str = "postgresql://devstep:devstep_local_2026@db:5432/devstep_db"
 
     # ── Supabase Cloud ──
     SUPABASE_URL: str = ""

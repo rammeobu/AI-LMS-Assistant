@@ -1,16 +1,17 @@
 "use client";
-import { useEffect, useState, Suspense } from "react";
+
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  CheckCircle2,
-  ChevronRight,
-  User as UserIcon,
-  Code2,
-  Globe,
-  Cloud,
-  Bot,
-  Gamepad2,
+import { 
+  CheckCircle2, 
+  ChevronRight, 
+  User as UserIcon, 
+  Code2, 
+  Globe, 
+  Cloud, 
+  Bot, 
+  Gamepad2, 
   Lock,
   ArrowRight,
   Plus,
@@ -32,7 +33,7 @@ import { analyzeGithubStackWithAI, checkGithubToken } from "@/app/actions/github
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 
-function UnifiedSurveyContent() {
+export default function UnifiedSurveyPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [currentStep, setCurrentStep] = useState(1);
@@ -41,7 +42,7 @@ function UnifiedSurveyContent() {
   const [isFinished, setIsFinished] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-
+  
   // Point A + Point B 통합 데이터 상태
   const [surveyData, setSurveyData] = useState({
     // Point A Fields
@@ -50,12 +51,12 @@ function UnifiedSurveyContent() {
     status: [] as string[],
     experience: "",
     interests: [] as string[],
-
+    
     // Point B Fields
-    careerGaps: [] as string[],
-    targetDomain: [] as string[],
-    availableResource: "미들형",
-    freeIdea: ""
+    careerGaps: [] as string[], 
+    targetDomain: [] as string[], 
+    availableResource: "미들형", 
+    freeIdea: "" 
   });
 
   // 기존 데이터 불러오기 (Pre-fill) 및 자동 스캔 체크
@@ -83,7 +84,7 @@ function UnifiedSurveyContent() {
           const url = new URL(window.location.href);
           url.searchParams.delete('scan');
           window.history.replaceState({}, '', url.pathname + url.search);
-
+          
           handleGithubScan();
         }
       } catch (err) {
@@ -100,7 +101,7 @@ function UnifiedSurveyContent() {
     try {
       // 1. 먼저 DB에 토큰이 있는지 확인 (리다이렉트 최소화)
       const tokenStatus = await checkGithubToken();
-
+      
       if (!tokenStatus.success) {
         // 토큰이 없으면 OAuth 유도
         const supabase = createClient();
@@ -228,7 +229,7 @@ function UnifiedSurveyContent() {
   if (isFinished) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center p-6">
-        <motion.div
+        <motion.div 
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           className="max-w-md w-full text-center"
@@ -239,8 +240,8 @@ function UnifiedSurveyContent() {
           <h2 className="text-3xl font-black text-gray-900 mb-4">모든 진단이 완료되었습니다!</h2>
           <p className="text-gray-500 font-bold mb-8 italic">사용자님의 현재와 미래를 잇는 최적의 로드맵을 생성 중입니다...</p>
           <div className="flex flex-col items-center gap-2">
-            <Loader2 className="w-8 h-8 text-primary animate-spin" />
-            <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Generating Roadmap...</span>
+             <Loader2 className="w-8 h-8 text-primary animate-spin" />
+             <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Generating Roadmap...</span>
           </div>
         </motion.div>
       </div>
@@ -250,7 +251,7 @@ function UnifiedSurveyContent() {
   // 상단 헤더 텍스트 동적 결정
   const isPhaseA = currentStep <= 4;
   const headerTitle = isPhaseA ? "나의 현재 위치(Point A) 설정" : "나의 목표 지점(Point B) 설정";
-  const headerDesc = isPhaseA
+  const headerDesc = isPhaseA 
     ? "정확한 진단은 성공적인 커리어 설계의 시작입니다. 현재의 기술 스택을 정렬해보세요."
     : "어떤 이력서를 만들고 싶나요? 미래의 나를 위한 결핍과 방향성을 설정합니다.";
 
@@ -260,14 +261,15 @@ function UnifiedSurveyContent() {
         {/* Header Section */}
         <div className="text-center mb-12">
           <AnimatePresence mode="wait">
-            <motion.div
+            <motion.div 
               key={isPhaseA ? "phaseA" : "phaseB"}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
             >
-              <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-bold mb-4 transition-colors ${isPhaseA ? "bg-primary/5 border-primary/10 text-primary" : "bg-purple-50 border-purple-100 text-purple-600"
-                }`}>
+              <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-bold mb-4 transition-colors ${
+                isPhaseA ? "bg-primary/5 border-primary/10 text-primary" : "bg-purple-50 border-purple-100 text-purple-600"
+              }`}>
                 {isPhaseA ? <Sparkles className="w-3.5 h-3.5" /> : <Zap className="w-3.5 h-3.5" />}
                 {isPhaseA ? "PHASE 1: CURRENT STATUS" : "PHASE 2: FUTURE GOALS"}
               </div>
@@ -283,7 +285,7 @@ function UnifiedSurveyContent() {
         <div className="bg-white rounded-[40px] shadow-2xl shadow-primary/5 border border-gray-100 overflow-hidden min-h-[640px] flex flex-col relative transition-all duration-500">
           {/* Progress Bar */}
           <div className="h-2 bg-gray-100 w-full overflow-hidden">
-            <motion.div
+            <motion.div 
               initial={{ width: "0%" }}
               animate={{ width: `${(currentStep / 8) * 100}%` }}
               className={`h-full transition-all duration-500 ${isPhaseA ? "bg-primary" : "bg-purple-500"}`}
@@ -319,8 +321,8 @@ function UnifiedSurveyContent() {
                         </div>
                       </div>
                     ) : (
-                      <button
-                        onClick={handleGithubScan}
+                      <button 
+                        onClick={handleGithubScan} 
                         className="px-10 py-5 bg-gray-900 text-white rounded-[24px] font-bold flex items-center gap-3 hover:bg-black transition-all shadow-2xl active:scale-95 group"
                       >
                         <Terminal className="w-6 h-6 group-hover:animate-pulse" /> 깃허브 AI 분석으로 스택 추출하기
@@ -399,7 +401,7 @@ function UnifiedSurveyContent() {
 
               {currentStep === 3 && (
                 <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-12 flex-1">
-                  <div className="flex items-center gap-4">
+                   <div className="flex items-center gap-4">
                     <div className="w-14 h-14 rounded-2xl bg-orange-500 flex items-center justify-center shadow-lg shadow-orange-500/20">
                       <TrendingUp className="w-7 h-7 text-white" />
                     </div>
@@ -434,7 +436,7 @@ function UnifiedSurveyContent() {
 
               {currentStep === 4 && (
                 <motion.div key="step4" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-12 flex-1">
-                  <div className="flex items-center gap-4">
+                   <div className="flex items-center gap-4">
                     <div className="w-14 h-14 rounded-2xl bg-purple-500 flex items-center justify-center shadow-lg shadow-purple-500/20">
                       <Sparkles className="w-7 h-7 text-white" />
                     </div>
@@ -487,12 +489,12 @@ function UnifiedSurveyContent() {
                     ].map((item) => {
                       const isActive = surveyData.careerGaps.includes(item.id);
                       return (
-                        <button key={item.id}
+                        <button key={item.id} 
                           onClick={() => {
                             setSurveyData(prev => ({
                               ...prev,
-                              careerGaps: isActive
-                                ? prev.careerGaps.filter(i => i !== item.id)
+                              careerGaps: isActive 
+                                ? prev.careerGaps.filter(i => i !== item.id) 
                                 : prev.careerGaps.length < 2 ? [...prev.careerGaps, item.id] : [prev.careerGaps[1], item.id]
                             }));
                           }}
@@ -500,9 +502,9 @@ function UnifiedSurveyContent() {
                           <h4 className="font-black text-lg">{item.label}</h4>
                           <p className={`text-sm font-bold leading-relaxed ${isActive ? "text-white/80" : "text-gray-400"}`}>{item.desc}</p>
                           <div className="mt-auto pt-4 flex w-full justify-end">
-                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${isActive ? "bg-white border-white text-purple-600" : "border-gray-200"}`}>
-                              {isActive && <CheckCircle2 className="w-4 h-4" />}
-                            </div>
+                             <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${isActive ? "bg-white border-white text-purple-600" : "border-gray-200"}`}>
+                                {isActive && <CheckCircle2 className="w-4 h-4" />}
+                             </div>
                           </div>
                         </button>
                       );
@@ -524,7 +526,7 @@ function UnifiedSurveyContent() {
                   </div>
                   <div className="flex flex-wrap gap-4 justify-center py-10">
                     {[
-                      "🤖 AI / 데이터 에이전트", "☁️ 백엔드 / 대용량 서버", "🎮 게임 엔진 최적화",
+                      "🤖 AI / 데이터 에이전트", "☁️ 백엔드 / 대용량 서버", "🎮 게임 엔진 최적화", 
                       "🌍 공공데이터 연동 서비스", "🔒 네트워크 / 보안", "📱 모바일 크로스플랫폼",
                       "🎨 디자인 시스템 / 인터랙션", "🧪 QA / 자동화 테스트", "🏗️ 인프라 / DevOps"
                     ].map(domain => {
@@ -537,10 +539,11 @@ function UnifiedSurveyContent() {
                               targetDomain: isActive ? prev.targetDomain.filter(d => d !== domain) : [...prev.targetDomain, domain]
                             }));
                           }}
-                          className={`px-8 py-4 rounded-[20px] text-lg font-black transition-all border-2 ${isActive
-                            ? "bg-purple-600 border-purple-600 text-white shadow-xl shadow-purple-200 scale-105"
-                            : "bg-white border-gray-100 text-gray-400 hover:border-purple-400 hover:text-purple-600"
-                            }`}
+                          className={`px-8 py-4 rounded-[20px] text-lg font-black transition-all border-2 ${
+                            isActive 
+                              ? "bg-purple-600 border-purple-600 text-white shadow-xl shadow-purple-200 scale-105" 
+                              : "bg-white border-gray-100 text-gray-400 hover:border-purple-400 hover:text-purple-600"
+                          }`}
                         >
                           {domain}
                         </button>
@@ -571,13 +574,14 @@ function UnifiedSurveyContent() {
                       return (
                         <button key={res.id}
                           onClick={() => setSurveyData(prev => ({ ...prev, availableResource: res.id }))}
-                          className={`p-8 rounded-[32px] border-2 text-left transition-all flex items-center gap-6 ${isActive
-                            ? "bg-purple-600 border-purple-600 text-white shadow-2xl shadow-purple-200 translate-x-3"
-                            : "bg-white border-gray-100 text-gray-900 hover:bg-purple-50"
-                            }`}
+                          className={`p-8 rounded-[32px] border-2 text-left transition-all flex items-center gap-6 ${
+                            isActive 
+                              ? "bg-purple-600 border-purple-600 text-white shadow-2xl shadow-purple-200 translate-x-3" 
+                              : "bg-white border-gray-100 text-gray-900 hover:bg-purple-50"
+                          }`}
                         >
                           <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xl ${isActive ? "bg-white/20" : "bg-purple-50 text-purple-600"}`}>
-                            {isActive ? <CheckCircle2 /> : res.label[0]}
+                             {isActive ? <CheckCircle2 /> : res.label[0]}
                           </div>
                           <div>
                             <h4 className="font-extrabold text-xl mb-1">{res.label}</h4>
@@ -602,14 +606,14 @@ function UnifiedSurveyContent() {
                     </div>
                   </div>
                   <div className="relative group">
-                    <textarea
+                    <textarea 
                       value={surveyData.freeIdea}
                       onChange={(e) => setSurveyData(prev => ({ ...prev, freeIdea: e.target.value }))}
                       placeholder="예: 기상청 OpenAPI를 활용해서 조건부 알림을 주는 캘린더 서비스를 만들고 싶어요."
                       className="w-full min-h-[240px] p-10 rounded-[40px] bg-gray-50 border-2 border-gray-100 focus:border-purple-600 focus:bg-white transition-all outline-none font-bold text-gray-900 resize-none placeholder:text-gray-300"
                     />
                     <div className="absolute top-4 right-10 flex gap-2">
-                      <div className="px-3 py-1 bg-purple-100 text-purple-600 rounded-lg text-[10px] font-black uppercase tracking-widest">Natural Language Entry</div>
+                       <div className="px-3 py-1 bg-purple-100 text-purple-600 rounded-lg text-[10px] font-black uppercase tracking-widest">Natural Language Entry</div>
                     </div>
                   </div>
                   <div className="flex justify-center italic text-gray-400 text-sm font-medium">💡 구체적일수록 LLM이 더 정확한 공모전과 대외활동을 추천해드립니다.</div>
@@ -619,7 +623,7 @@ function UnifiedSurveyContent() {
 
             {/* Navigation Buttons */}
             <div className="mt-16 pt-10 flex items-center justify-between border-t border-gray-100">
-              <button
+              <button 
                 onClick={() => currentStep > 1 && setCurrentStep(curr => curr - 1)}
                 disabled={currentStep === 1}
                 className="px-8 py-4 text-sm font-black text-gray-400 hover:text-gray-900 transition-colors disabled:opacity-0 flex items-center gap-2"
@@ -627,22 +631,23 @@ function UnifiedSurveyContent() {
                 <ArrowRight className="w-5 h-5 rotate-180" />
                 이전 단계
               </button>
-
+              
               <div className="flex items-center gap-3">
                 {currentStep === 8 && (
-                  <button
+                   <button 
                     onClick={handleFinishSurvey}
                     className="px-8 py-4 text-sm font-black text-gray-400 hover:text-purple-600 transition-colors"
                   >
                     건너뛰기
                   </button>
                 )}
-                <button
+                <button 
                   onClick={handleNextStep}
-                  className={`px-12 py-5 rounded-[24px] font-black text-lg shadow-2xl flex items-center gap-3 transition-all ${isStepValid()
-                    ? (isPhaseA ? "bg-primary shadow-primary/10 hover:scale-[1.02] active:scale-95 text-white" : "bg-purple-600 shadow-purple-200 hover:scale-[1.02] active:scale-95 text-white")
-                    : "bg-gray-200 text-gray-400 cursor-not-allowed shadow-none"
-                    }`}
+                  className={`px-12 py-5 rounded-[24px] font-black text-lg shadow-2xl flex items-center gap-3 transition-all ${
+                    isStepValid()
+                      ? (isPhaseA ? "bg-primary shadow-primary/10 hover:scale-[1.02] active:scale-95 text-white" : "bg-purple-600 shadow-purple-200 hover:scale-[1.02] active:scale-95 text-white")
+                      : "bg-gray-200 text-gray-400 cursor-not-allowed shadow-none"
+                  }`}
                 >
                   {currentStep === 8 ? "진단 완료 및 로드맵 생성" : "다음 단계로"}
                   <ArrowRight className={`w-6 h-6 ${isStepValid() ? "group-hover:translate-x-1" : ""}`} />
@@ -653,13 +658,5 @@ function UnifiedSurveyContent() {
         </div>
       </div>
     </div>
-  );
-}
-
-export default function UnifiedSurveyPage() {
-  return (
-    <Suspense fallback={<div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center"><Loader2 className="w-10 h-10 text-primary animate-spin" /></div>}>
-      <UnifiedSurveyContent />
-    </Suspense>
   );
 }
