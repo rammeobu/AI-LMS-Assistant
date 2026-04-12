@@ -1,0 +1,70 @@
+"""
+output_hook.py
+출력 후처리 훅 - AI 응답을 파싱하고 정규화
+"""
+
+import json
+import re
+
+
+def postprocess(raw_response: str, expected_keys: list[str]) -> dict:
+    """
+    AI 응답 후처리
+    - JSON 파싱
+    - 필수 키 존재 여부 검증
+    - 이상 출력 감지
+    """
+    # 마크다운 코드블록 제거 (```json ... ``` 형태 대응)
+    cleaned = re.sub(r"```(?:json)?", "", raw_response).strip()
+
+    try:
+        parsed = json.loads(cleaned)
+    except json.JSONDecodeError:
+        return {
+            "error": True,
+            "message": "AI 응답을 JSON으로 파싱할 수 없습니다. 재시도가 필요합니다.",
+            "raw": raw_response,
+        }
+
+    # 필수 키 누락 검증
+    missing_keys = [k for k in expected_keys if k not in parsed]
+    if missing_keys:
+        return {
+            "error": True,
+            "message": f"응답에 필수 키가 누락되었습니다: {missing_keys}",
+            "raw": raw_response,
+        }
+
+    return {"error": False, "data": parsed}
+
+
+def postprocess_portfolio(raw_response: str) -> dict:
+    """포트폴리오 분석 결과 후처리"""
+    required_keys = ["scores", "overall_score", "strengths", "weaknesses", "missing_skills", "summary"]
+    result = postprocess(raw_response, required_keys)
+
+    if result["error"]:
+        return result
+
+    data = result["data"]
+
+    # overall_score 범위 보정 (0~100)
+    data["overall_score"] = max(0, min(100, int(data.get("overall_score", 0))))
+
+    # scores 각 항목 범위 보정
+    for key in data.get("scores", {}):
+        data["scores"][key] = max(0, min(100, int(data["scores"][key])))
+
+    return {"error": False, "data": data}
+
+
+def postprocess_activity(raw_response: str) -> dict:
+    """활동 추천 결과 후처리"""
+    required_keys = ["certifications", "activities", "learning_resources"]
+    return postprocess(raw_response, required_keys)
+
+
+def postprocess_roadmap(raw_response: str) -> dict:
+    """로드맵 추천 결과 후처리"""
+    required_keys = ["target_job", "roadmap", "estimated_total_duration", "next_action"]
+    return postprocess(raw_response, required_keys)
