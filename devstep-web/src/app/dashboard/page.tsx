@@ -5,7 +5,7 @@ import { Suspense } from "react";
 import DashboardOverview from "@/components/DashboardOverview";
 import DiscoveryFeed from "@/components/DiscoveryFeed";
 import RoadmapPathfinder from "@/components/RoadmapPathfinder";
-import CalendarSync from "@/components/CalendarSync";
+import CalendarSync from "@/components/CalendarSyncV2";
 
 function DashboardContent() {
   const searchParams = useSearchParams();

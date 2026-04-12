@@ -3,10 +3,10 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  User, 
-  Mail, 
-  Save, 
+import {
+  User,
+  Mail,
+  Save,
   ArrowLeft,
   ArrowRight,
   Loader2,
@@ -70,9 +70,9 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-20 pt-24 font-outfit">
       <div className="max-w-3xl mx-auto px-4">
-        
+
         {/* Header Navigation */}
-        <button 
+        <button
           onClick={() => router.back()}
           className="flex items-center gap-2 text-gray-500 hover:text-gray-900 transition-colors mb-8 group"
         >
@@ -87,7 +87,7 @@ export default function ProfilePage() {
         >
           {/* Cover / Profile Header */}
           <div className="h-32 bg-gradient-to-r from-primary/10 via-purple-500/10 to-pink-500/10 relative" />
-          
+
           <div className="px-8 pb-10">
             <div className="relative -mt-12 mb-8 flex items-end gap-6">
               <div className="w-24 h-24 rounded-3xl bg-white p-1.5 shadow-lg relative">
@@ -116,7 +116,7 @@ export default function ProfilePage() {
                     <User className="w-5 h-5 text-primary" /> 기본 계정 정보
                   </h2>
                 </div>
-                
+
                 <form onSubmit={handleSave} className="space-y-6 bg-gray-50/50 p-6 rounded-3xl border border-gray-100">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Nickname Input */}
@@ -124,10 +124,10 @@ export default function ProfilePage() {
                       <label className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-widest px-1">
                         <User className="w-4 h-4" /> 닉네임
                       </label>
-                      <input 
+                      <input
                         type="text"
                         value={profile?.name || ""}
-                        onChange={(e) => setProfile(prev => prev ? {...prev, name: e.target.value} : null)}
+                        onChange={(e) => setProfile(prev => prev ? { ...prev, name: e.target.value } : null)}
                         placeholder="활동할 닉네임을 입력하세요"
                         className="w-full bg-white border border-gray-100 rounded-2xl p-4 focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all font-bold text-gray-900"
                       />
@@ -146,7 +146,7 @@ export default function ProfilePage() {
                   </div>
 
                   <div className="flex justify-end pt-2">
-                    <button 
+                    <button
                       type="submit"
                       disabled={isSaving}
                       className="px-8 py-3.5 bg-gray-900 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-black transition-all disabled:opacity-50"
@@ -171,12 +171,12 @@ export default function ProfilePage() {
                   <div className="relative z-10">
                     <h3 className="text-xl font-bold mb-3">상세 진단 정보 관리를 원하시나요?</h3>
                     <p className="text-gray-400 text-sm leading-relaxed mb-8 max-w-md">
-                      전공, 핵심 기술, 지향하는 커리어 도메인 등 분석에 필요한 데이터는 
-                      정밀 진단 프로세스를 통해 더욱 정교하게 업데이트할 수 있습니다. 
+                      전공, 핵심 기술, 지향하는 커리어 도메인 등 분석에 필요한 데이터는
+                      정밀 진단 프로세스를 통해 더욱 정교하게 업데이트할 수 있습니다.
                       기존 데이터를 유지한 채로 수정이 가능합니다.
                     </p>
-                    
-                    <button 
+
+                    <button
                       onClick={() => router.push("/setup/point-a")}
                       className="flex items-center gap-3 px-6 py-4 bg-white text-gray-900 rounded-2xl font-bold hover:bg-primary hover:text-white transition-all group/btn"
                     >
@@ -190,13 +190,12 @@ export default function ProfilePage() {
               {/* Feedback Toast */}
               <AnimatePresence>
                 {saveStatus !== 'idle' && (
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 20 }}
-                    className={`fixed bottom-10 left-1/2 -translate-x-1/2 px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 font-bold z-50 ${
-                      saveStatus === 'success' ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'
-                    }`}
+                    className={`fixed bottom-10 left-1/2 -translate-x-1/2 px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 font-bold z-50 ${saveStatus === 'success' ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'
+                      }`}
                   >
                     {saveStatus === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
                     {saveStatus === 'success' ? '프로필이 성공적으로 업데이트되었습니다.' : '저장에 실패했습니다. 다시 시도해주세요.'}

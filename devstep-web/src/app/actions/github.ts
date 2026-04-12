@@ -68,7 +68,7 @@ export async function analyzeGithubStackWithAI() {
     }
 
     // 3. 메타데이터 분석 및 주요 README 선별 (최대 10개)
-    const sortedRepos = [...repos].sort((a, b) => 
+    const sortedRepos = [...repos].sort((a, b) =>
       new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime()
     ).slice(0, 10)
 
@@ -80,7 +80,7 @@ export async function analyzeGithubStackWithAI() {
           repo: repo.name,
         })
         readme = Buffer.from(readmeData.content, 'base64').toString('utf8').slice(0, 800)
-      } catch (e) {}
+      } catch (e) { }
 
       return `Project: ${repo.name} | Lang: ${repo.language} | Desc: ${repo.description || ''}\nREADME: ${readme}\n`
     }))
@@ -110,20 +110,22 @@ ${repoContexts.join('\n\n')}
       .update({ github_token: null })
       .eq('id', user.id)
 
-    return { 
-      success: true, 
+    return {
+      success: true,
       skills: skills as string[],
       message: `총 ${repos.length}개의 레포지토리를 분석하여 ${skills.length}개의 기술 스택을 추출했습니다. (보안을 위해 토큰은 즉시 삭제되었습니다.)`
     }
 
   } catch (error: any) {
     console.error('GitHub AI Analysis error:', error)
-    // 에러 발생 시에도 보안을 위해 토큰 삭제 시도
-    await supabase.from('users').update({ github_token: null }).eq('id', user.id)
-    
-    return { 
-      success: false, 
-      error: error.message || 'AI 분석 중 오류가 발생했습니다.' 
+
+    try {
+      await supabase.from('users').update({ github_token: null }).eq('id', user.id)
+    } catch (e) { }
+
+    return {
+      success: false,
+      error: error.message || 'AI 분석 중 오류가 발생했습니다.'
     }
   }
 }
