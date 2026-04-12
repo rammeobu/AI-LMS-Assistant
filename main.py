@@ -2,7 +2,7 @@ import time
 from id_collector import collect_activity_ids
 from detail_data import crawl_activities
 from supabase_handler import db_manager
-from ai import process_and_save_to_new_table  # 👈 4단계를 위해 ai 모듈에서 함수 가져오기
+from ai import process_and_save_to_new_table
 
 INTERVAL_HOURS = 12
 
@@ -22,7 +22,6 @@ if __name__ == "__main__":
             print("🚀 3단계: Supabase 클라우드 전송 (Raw Data)")
             db_manager.upload_activities(crawled_data)
             
-            # 💡 새롭게 추가된 4단계: AI 가공 파이프라인
             print(f"\n{'='*40}")
             print("🚀 4단계: AI 맞춤형 키워드 가공 및 DB 적재")
             try:

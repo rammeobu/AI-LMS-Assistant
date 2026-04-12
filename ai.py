@@ -21,8 +21,6 @@ if not url or not key or not gemini_key:
     print("\n🚨 [치명적 오류] 환경 변수를 읽지 못했습니다. .env 파일을 확인하세요.")
     exit()
 
-print("✅ 환경 변수 로드 성공! 파이프라인을 시작합니다.\n")
-
 # ==========================================
 # 2. 클라이언트 초기화
 # ==========================================
@@ -33,9 +31,9 @@ gemini_client = genai.Client(api_key=gemini_key)
 # 3. 메인 가공 파이프라인 함수
 # ==========================================
 def process_and_save_to_new_table():
-    print("🚀 IT 대학생 맞춤형 AI 가공 시작")
+    print("🚀 IT 대학생 맞춤형 AI 가공 시작 (RPM 쿨다운 및 무중단 탐색 적용)")
     
-    # 가공 안 된 데이터 찾기 (ai_processed_data에 없는 데이터만)
+    # 가공 안 된 데이터 찾기
     response = supabase.table("crawling_data") \
         .select("id, title, description, ai_processed_data!left(crawling_id)") \
         .is_("ai_processed_data.crawling_id", "null") \
@@ -46,6 +44,13 @@ def process_and_save_to_new_table():
     if not unprocessed_items:
         print("✨ 모든 데이터 가공 완료!")
         return
+
+    # 구글 최신 무료 모델 후보군
+    models_to_try = [
+        'gemini-2.5-flash-lite', 
+        'gemini-2.5-flash',
+        'gemini-3.1-flash-lite-preview'
+    ]
 
     for item in unprocessed_items:
         print(f"\n🔄 가공 중: [{item['id']}] {item['title']}")
@@ -73,38 +78,62 @@ def process_and_save_to_new_table():
         {truncated_text}
         """
         
-        try:
-            # AI 호출
-            response = gemini_client.models.generate_content(
-                model='gemini-flash-latest',
-                contents=prompt,
-                config=types.GenerateContentConfig(response_mime_type="application/json")
-            )
-            
-            # JSON 파싱 (한 번만 수행)
-            ai_result = json.loads(response.text)
-            d_tags = ai_result.get("domain_tags", [])
-            a_tags = ai_result.get("activity_types", [])
-            b_tags = ai_result.get("benefit_tags", [])
-            
-            # DB 저장 (upsert 사용)
-            supabase.table("ai_processed_data").upsert({
-                "crawling_id": item["id"],
-                "domain_tags": d_tags,
-                "activity_types": a_tags,
-                "benefit_tags": b_tags
-            }).execute()
-            
-            # 로그 출력 최적화
-            print(f"  ✅ 가공 완료 및 DB 저장 성공!")
-            print(f"     ㄴ 분야: {d_tags}")
-            print(f"     ㄴ 유형: {a_tags}")
-            print(f"     ㄴ 혜택: {b_tags}")
-            
-        except Exception as e:
-            print(f"  ❌ 처리 실패 ({item['id']}): {e}")
+        success = False
+        
+        for target_model in models_to_try:
+            if success: 
+                break 
+                
+            MAX_RETRIES = 3 # 재시도 횟수를 3회로 넉넉하게 늘림
+            for attempt in range(MAX_RETRIES):
+                try:
+                    response = gemini_client.models.generate_content(
+                        model=target_model,
+                        contents=prompt,
+                        config=types.GenerateContentConfig(response_mime_type="application/json")
+                    )
+                    
+                    ai_result = json.loads(response.text)
+                    d_tags = ai_result.get("domain_tags", [])
+                    a_tags = ai_result.get("activity_types", [])
+                    b_tags = ai_result.get("benefit_tags", [])
+                    
+                    supabase.table("ai_processed_data").upsert({
+                        "crawling_id": item["id"],
+                        "domain_tags": d_tags,
+                        "activity_types": a_tags,
+                        "benefit_tags": b_tags
+                    }).execute()
+                    
+                    print(f"  ✅ 가공 완료 및 DB 저장 성공! (사용한 모델: {target_model})")
+                    success = True
+                    break 
+                    
+                except Exception as e:
+                    error_msg = str(e)
+                    
+                    if "404" in error_msg:
+                        break # 이름이 없는 모델은 즉시 버리고 다음 모델로
+                    
+                    # 💡 핵심 추가: 분당 요청 한도(429) 초과 시 60초 대기하여 쿼터 초기화!
+                    if "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg:
+                        if attempt < MAX_RETRIES - 1:
+                            print(f"  ⏳ 분당 요청 한도 도달(429). 60초간 숨 고르기 후 재시도합니다... ({attempt+1}/{MAX_RETRIES})")
+                            time.sleep(60)
+                            continue
+                            
+                    if "503" in error_msg or "UNAVAILABLE" in error_msg:
+                        if attempt < MAX_RETRIES - 1:
+                            print(f"  ⚠️ 서버 과부하(503). 10초 대기 후 재시도... ({attempt+1}/{MAX_RETRIES})")
+                            time.sleep(10)
+                            continue
+                            
+                    break
 
-        # 무료 티어 안정성을 위해 5초 대기
+        if not success:
+            print(f"  ❌ 모든 모델 가공 실패 ({item['id']}). 다음 데이터로 넘어갑니다.")
+
+        # 무료 티어 안정성을 위해 데이터 하나당 기본 5초 대기
         time.sleep(5) 
 
 if __name__ == "__main__":

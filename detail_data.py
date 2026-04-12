@@ -141,7 +141,6 @@ def crawl_activities(activity_ids: list[int]) -> list[dict]:
         """)
         page = context.new_page()
 
-        # 💡 수정된 부분: for문이 먼저 시작하고, 그 안에서 try-except로 개별 데이터를 방어합니다!
         for idx, activity_id in enumerate(activity_ids, start=1):
             try:
                 print(f"  🔍 [{idx}/{len(activity_ids)}] ID={activity_id}")
@@ -154,7 +153,6 @@ def crawl_activities(activity_ids: list[int]) -> list[dict]:
                     timeout=60000,
                 )
                 
-                # 💡 수정된 부분: networkidle 대신 domcontentloaded 사용 (타임아웃 획기적 감소)
                 page.wait_for_load_state("domcontentloaded", timeout=60000)
                 page.wait_for_timeout(2500)
 
@@ -176,7 +174,6 @@ def crawl_activities(activity_ids: list[int]) -> list[dict]:
                 time.sleep(random.uniform(1.5, 3.5))
 
             except Exception as e:
-                # 💡 특정 페이지가 터져도 스킵하고 24번, 25번으로 계속 넘어갑니다.
                 print(f"  ❌ ID={activity_id} 에러 발생 (스킵하고 계속 진행): {e}")
                 continue
 

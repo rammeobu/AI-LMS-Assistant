@@ -20,7 +20,7 @@ class SupabaseManager:
             print("  ⚠️ 전송할 데이터가 없습니다.")
             return
 
-        # 1. 크롤링된 한글 키를 Supabase의 영문 컬럼명에 매핑 (poster_url 제외)
+        # 1. 크롤링된 한글 키를 Supabase의 영문 컬럼명에 매핑
         mapped_data = []
         for item in data_list:
             mapped_data.append({
@@ -36,13 +36,11 @@ class SupabaseManager:
                 "description":  item.get("상세내용"),
             })
 
-        # 2. 클라우드 DB로 전송 (100건씩 묶어서 전송하여 네트워크 부하 방지)
+        # 2. 클라우드 DB로 전송
         try:
             batch_size = 100
             for i in range(0, len(mapped_data), batch_size):
                 batch = mapped_data[i : i + batch_size]
-                
-                # 테이블명 'crawling_data' 지정 및 중복 방지 로직(upsert) 적용
                 self.supabase.table("crawling_data").upsert(
                     batch, 
                     on_conflict="id"
@@ -52,5 +50,5 @@ class SupabaseManager:
         except Exception as e:
             print(f"  ☁️ ❌ Supabase 업로드 실패: {e}")
 
-# 다른 파일에서 불러다 쓸 수 있도록 인스턴스화
+# 다른 파일에서 바로 사용할 수 있도록 인스턴스 생성
 db_manager = SupabaseManager()
