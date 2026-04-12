@@ -1,0 +1,94 @@
+services:
+  # ── Frontend: Next.js (Hot-reload enabled) ──
+  devstep-web:
+    build:
+      context: ./devstep-web
+      dockerfile: Dockerfile
+      target: deps
+      args:
+        - NEXT_PUBLIC_API_URL=http://localhost:8000
+        - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+        - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+    container_name: devstep-web
+    ports:
+      - "3000:3000"
+    env_file: ./.env.local
+    volumes:
+      - ./devstep-web:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+    command: npm run dev
+    restart: unless-stopped
+
+  # ── Backend: FastAPI (API) ──
+  devstep-ai:
+    build:
+      context: ./devstep-ai
+      dockerfile: Dockerfile
+    container_name: devstep-ai
+    ports:
+      - "8000:8000"
+    env_file: ./.env.web
+    volumes:
+      - ./devstep-ai:/app
+      - /app/.venv
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+    restart: unless-stopped
+
+  # ── Backend: Celery Worker ──
+  devstep-worker:
+    build:
+      context: ./devstep-ai
+      dockerfile: Dockerfile
+    container_name: devstep-worker
+    env_file: ./.env.web
+    volumes:
+      - ./devstep-ai:/app
+      - /app/.venv
+    depends_on:
+      redis:
+        condition: service_started
+      db:
+        condition: service_healthy
+    command: celery -A app.worker.celery_app worker --loglevel=info
+    restart: unless-stopped
+
+  # ── Database: PostgreSQL 16 + pgvector ──
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: devstep-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-devstep}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devstep_local_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-devstep_db}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./devstep-ai/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-devstep} -d ${POSTGRES_DB:-devstep_db}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── Redis (Broker) ──
+  redis:
+    image: redis:7-alpine
+    container_name: devstep-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redis_data:
