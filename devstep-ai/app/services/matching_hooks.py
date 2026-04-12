@@ -46,7 +46,7 @@ async def preprocess_query(raw_skills: list[str], client) -> list[str]:
     try:
         # Google GenAI Native SDK 호출
         response = await client.aio.models.generate_content(
-            model="gemini-3.1-flash-lite-preview",
+            model="gemini-3-flash-preview",
             contents=prompt,
         )
         

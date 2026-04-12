@@ -25,6 +25,10 @@ if _database_url.startswith("postgresql://"):
 # ── 비동기 엔진 생성 ──
 engine = create_async_engine(
     _database_url,
+    connect_args={
+        "prepared_statement_cache_size": 0,
+        "statement_cache_size": 0  # PgBouncer 트랜잭션 모드에서 완벽한 호환성을 위해 추가
+    },
     echo=False,          # True로 변경 시 SQL 로그 출력
     pool_size=10,
     max_overflow=20,

@@ -55,10 +55,11 @@ export async function analyzeGithubStackWithAI() {
     const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY!)
     const model = genAI.getGenerativeModel({ model: 'gemini-flash-lite-latest' })
 
-    // 2. [고도화] 모든 공개 레포지토리 가져오기 (Pagination 처리)
-    const repos = await octokit.paginate(octokit.rest.repos.listForAuthenticatedUser, {
+    // 2. [최적화] 최근 업데이트된 공개 레포지토리 10개만 가져오기 (Timeout 방지)
+    const { data: repos } = await octokit.rest.repos.listForAuthenticatedUser({
       type: 'public',
-      per_page: 100
+      sort: 'updated',
+      per_page: 10
     })
 
     if (repos.length === 0) {
@@ -67,10 +68,8 @@ export async function analyzeGithubStackWithAI() {
       return { success: true, skills: [], message: '분석할 레포지토리가 없습니다.' }
     }
 
-    // 3. 메타데이터 분석 및 주요 README 선별 (최대 10개)
-    const sortedRepos = [...repos].sort((a, b) => 
-      new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime()
-    ).slice(0, 10)
+    // 3. 메타데이터 분석 및 주요 README 선별
+    const sortedRepos = repos; // 이미 정렬되어 가져옴
 
     const repoContexts = await Promise.all(sortedRepos.map(async (repo) => {
       let readme = ''

@@ -47,26 +47,9 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // 2. Logged in: Check onboarding status
+  // 2. Logged in: (Onboarding check is delegated to components)
   if (user) {
-    const { data: userData } = await supabase
-      .from('users')
-      .select('is_onboarded')
-      .eq('id', user.id)
-      .single()
-
-    const isOnboardingPage = request.nextUrl.pathname.startsWith('/onboarding')
-    const isDashboardPage = request.nextUrl.pathname.startsWith('/dashboard')
-
-    // 온보딩 상태가 DB에 반영되지 않아도 대시보드 접근이 가능하도록 잠시 주석 처리했던 로직을 활성화합니다.
-    if (!userData?.is_onboarded && isDashboardPage) {
-      return NextResponse.redirect(new URL('/onboarding', request.url))
-    }
-
-    // If already onboarded and trying to access onboarding, send to dashboard
-    if (userData?.is_onboarded && isOnboardingPage) {
-      return NextResponse.redirect(new URL('/dashboard', request.url))
-    }
+    // Session is valid, just proceed
   }
 
   return supabaseResponse

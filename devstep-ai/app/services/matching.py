@@ -13,9 +13,10 @@ from __future__ import annotations
 
 import logging
 import json
+import time
 
 from google import genai
-from google.genai import types
+from google.genai.types import HttpOptions, EmbedContentConfig
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,9 +39,11 @@ class MatchingService:
     Supabase 온보딩 데이터와 연동되는 AI 매칭 서비스
     """
     def __init__(self) -> None:
-        self._client = genai.Client(api_key=settings.GOOGLE_AI_API_KEY)
-        self._norm_model = "gemini-3.1-flash-lite-preview"
-        self._eval_model = "gemini-3.1-pro-preview"
+        # Task 5: Vertex AI 마이그레이션 (환경 변수 기반 자동 초기화)
+        self._client = genai.Client(http_options=HttpOptions(api_version="v1"))
+        self._norm_model = "gemini-3-flash-preview"
+        # Task 1: 모델 경량화 (Pro -> Flash)
+        self._eval_model = "gemini-3-flash-preview"
         self._embed_model = "gemini-embedding-001"
         self._dim = 3072
 
@@ -64,7 +67,7 @@ class MatchingService:
             result = await self._client.aio.models.embed_content(
                 model=self._embed_model,
                 contents=text,
-                config=types.EmbedContentConfig(output_dimensionality=self._dim)
+                config=EmbedContentConfig(output_dimensionality=self._dim)
             )
             return result.embeddings[0].values
         except Exception as e:
@@ -107,7 +110,9 @@ class MatchingService:
         """
         Supabase 설문 기반 RAG 매칭 파이프라인
         """
-        # 1. 기술 스택 결정 (수동 입력이 없으면 설문 데이터 사용)
+        start_total = time.time()
+        
+        # 1. 기술 스택 결정
         if manual_skills:
             skills_to_use = manual_skills
         else:
@@ -119,24 +124,41 @@ class MatchingService:
             return MatchResult(normalized_skills=[], matches=[])
 
         # 2. 정규화 (Input Hook)
-        logger.info("파이프라인 Step 1: 기술 스택 정규화")
+        start_step1 = time.time()
+        logger.info("파이프라인 Step 1: 기술 스택 정규화 시작")
         normalized = await preprocess_query(skills_to_use, self._client)
+        logger.info(f"파이프라인 Step 1 완료 (소요시간: {time.time() - start_step1:.4f}s)")
         
         # 3. 임베딩 및 검색
-        logger.info(f"파이프라인 Step 2: {self._dim}차원 임베딩 및 DB 검색")
+        start_step2 = time.time()
+        logger.info(f"파이프라인 Step 2: {self._dim}차원 임베딩 및 DB 검색 (top_k=10)")
         combined_text = ", ".join(normalized)
         vector = await self._get_embedding(combined_text)
-        candidates = await self._fetch_candidates(db, vector, top_k=20)
+        # Task 2: 후보군 축소 (20 -> 10)
+        candidates = await self._fetch_candidates(db, vector, top_k=10)
+        logger.info(f"파이프라인 Step 2 완료 (소요시간: {time.time() - start_step2:.4f}s)")
         
         if not candidates:
             return MatchResult(normalized_skills=normalized, matches=[])
 
         # 4. AI 심층 평가 (Prompt Injection)
-        logger.info("파이프라인 Step 3: AI 심층 평가")
+        start_step3 = time.time()
+        logger.info("파이프라인 Step 3: AI 심층 평가 시작 (Payload optimization)")
+        
+        # Task 3: 프롬프트 페이로드 다이어트 (Description 제외)
+        light_candidates = [
+            {
+                "activity_id": c["activity_id"],
+                "title": c["title"],
+                "required_skills": c["required_skills"]
+            }
+            for c in candidates
+        ]
+        
         variables = {
             "target_job": target_job,
             "skills": normalized,
-            "activities": candidates
+            "activities": light_candidates
         }
         prompt = inject_variables("app/prompts/matching_template.txt", variables)
         
@@ -144,10 +166,13 @@ class MatchingService:
             model=self._eval_model,
             contents=prompt
         )
+        logger.info(f"파이프라인 Step 3 완료 (소요시간: {time.time() - start_step3:.4f}s)")
         
         # 5. 후처리 (Output Hook)
         logger.info("파이프라인 Step 5: 결과 검증 및 후처리")
         final_matches = postprocess_match(response.text)
+        
+        logger.info(f"전체 매칭 파이프라인 완료 (총 소요시간: {time.time() - start_total:.4f}s)")
         
         return MatchResult(
             normalized_skills=normalized,
