@@ -68,7 +68,6 @@ export async function addActivityToCalendar(crawlingId: number) {
   console.log(`[LOG][USER] ID: ${user.id}, Email: ${user.email}`);
 
   try {
-    // 1. crawling_data에서 원본 데이터 조회
     const { data: crawl, error: crawlErr } = await supabase
       .from('crawling_data')
       .select('*')
@@ -81,7 +80,6 @@ export async function addActivityToCalendar(crawlingId: number) {
     }
     console.log(`[LOG][FETCH] Found title: ${crawl.title}`);
 
-    // 2. user_activities에 이미 있는지 확인 (중복 생성 방지)
     let { data: existingActivity } = await supabase
       .from('user_activities')
       .select('id')
@@ -92,8 +90,16 @@ export async function addActivityToCalendar(crawlingId: number) {
 
     if (!activityUuid) {
       console.log(`[LOG][CREATE] New record needed for user_activities`);
-      const safeStartDate = (crawl.start_date && crawl.start_date.trim() !== "") ? crawl.start_date : null;
-      const safeDeadline = (crawl.end_date && crawl.end_date.trim() !== "") ? crawl.end_date : null;
+      
+      // 날짜 정화 로직 (여기서도 적용하여 DB 정합성 유지)
+      const dateRegex = /^\d{4}[.-]\d{2}[.-]\d{2}/;
+      const isValidDate = (d: string | null) => d && dateRegex.test(d) && !isNaN(new Date(d).getTime());
+
+      const rawStart = crawl.start_date?.trim();
+      const rawEnd = crawl.end_date?.trim();
+      
+      const safeStartDate = isValidDate(rawStart) ? rawStart : null;
+      const safeDeadline = isValidDate(rawEnd) ? rawEnd : "9999-12-31";
 
       const { data: newActivity, error: insertError } = await supabase
         .from('user_activities')
@@ -116,12 +122,8 @@ export async function addActivityToCalendar(crawlingId: number) {
       }
       activityUuid = newActivity.id;
       console.log(`[LOG][CREATED] activityUuid = ${activityUuid}`);
-    } else {
-      console.log(`[LOG][EXISTS] activityUuid = ${activityUuid}`);
     }
 
-    // 3. user_calendar 테이블에 연결 (upsert)
-    console.log(`[LOG][LINK] Connecting user to activity...`);
     const { error: linkError } = await supabase
       .from('user_calendar')
       .upsert([{ user_id: user.id, activity_id: activityUuid }], { onConflict: 'user_id,activity_id' });
@@ -234,13 +236,23 @@ async function getFinalFallback(supabase: any, savedIds: number[], savedTitles: 
 }
 
 function formatActivity(item: any, raw: any, reasonPrefix: string) {
+  // 날짜 유효성 검사 및 정화 로직 (YYYY-MM-DD 형식 체크)
+  const isValidDate = (dateStr: string | null) => {
+    if (!dateStr) return false;
+    const dateRegex = /^\d{4}[.-]\d{2}[.-]\d{2}/;
+    return dateRegex.test(dateStr) && !isNaN(new Date(dateStr).getTime());
+  };
+
+  const rawEndDate = raw.end_date || item.date || null;
+  const cleanEndDate = isValidDate(rawEndDate) ? rawEndDate : "9999-12-31";
+
   return {
     id: item.crawling_id || raw.id || Math.random(),
     title: raw.title || item.title || "제목 없음",
     category: (item.activity_types && item.activity_types[0]) || "대외활동",
-    date: raw.end_date ? `마감: ${raw.end_date}` : "상시 모집",
+    date: cleanEndDate === "9999-12-31" ? "상시 모집" : `마감: ${cleanEndDate}`,
     raw_start_date: raw.start_date || null,
-    raw_end_date: raw.end_date || null,
+    raw_end_date: cleanEndDate,
     tag: (item.domain_tags && item.domain_tags[0]) || "추천",
     reason: `${reasonPrefix}: 유저님 맞춤 분석 완료!`,
     score: 95

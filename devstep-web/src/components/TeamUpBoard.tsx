@@ -1,68 +1,105 @@
 "use client";
 
-import { CheckCircle2, ChevronRight, Code2, ShieldAlert } from "lucide-react";
+import { CheckCircle2, ChevronRight, Code2, ShieldAlert, Loader2, Users } from "lucide-react";
+import { useEffect, useState } from "react";
+import { getAllTeamPosts, applyToTeam } from "../app/actions/teamActions";
 
 export default function TeamUpBoard() {
-  const dummyTeams = [
-    { title: "Next.js + SpringBoot 쇼핑몰 토이 프로젝트 팀원 구합니다", req: ["React", "Spring", "MySQL"], match: 85, status: "모집중 (1/4)" },
-    { title: "네이버 지도 API 활용한 혼밥 맛집 지도 앱 사이드 플젝", req: ["Swift", "Node.js"], match: 35, status: "모집중 (2/3)" },
-    { title: "2026 데브톤에 백엔드로 참여하실 분 구합니다!", req: ["Python", "FastAPI", "Redis"], match: 60, status: "모집중 (3/4)", highlight: true },
-  ];
+  const [teams, setTeams] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchTeams();
+  }, []);
+
+  const fetchTeams = async () => {
+    setIsLoading(true);
+    const res = await getAllTeamPosts();
+    if (res.success) {
+      setTeams(res.data || []);
+    }
+    setIsLoading(false);
+  };
+
+  const handleApply = async (postId: string) => {
+    const msg = prompt("함께하고 싶은 열정을 간단히 적어주세요!");
+    if (!msg) return;
+    const res = await applyToTeam(postId, msg);
+    if (res.success) {
+      alert("지원이 완료되었습니다!");
+      fetchTeams();
+    } else {
+      alert(res.error);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="py-20 flex flex-col items-center justify-center gap-3 text-primary animate-pulse">
+        <Loader2 className="w-10 h-10 animate-spin" />
+        <p className="text-xs font-black uppercase tracking-widest">Loading Live Recruitment...</p>
+      </div>
+    );
+  }
+
+  if (teams.length === 0) {
+    return (
+      <div className="py-20 text-center bg-gray-50/50 rounded-[40px] border-2 border-dashed border-gray-100 flex flex-col items-center gap-4">
+        <Users className="w-10 h-10 text-gray-200" />
+        <p className="text-gray-400 font-bold">진행 중인 팀원 모집이 없습니다.</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex justify-end mb-2">
-        <button className="px-5 py-2.5 bg-primary text-white font-semibold rounded-xl hover:bg-primary/90 transition-colors shadow-sm">
-          모집글 작성
-        </button>
-      </div>
-
-      <div className="flex flex-col gap-4 mt-4">
-        {dummyTeams.map((team, i) => (
-          <div key={i} className={`glass-card p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 transition-all hover:bg-white hover:border-gray-200 ${team.highlight ? "ring-2 ring-primary/20" : ""}`}>
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
-                <span className="px-2.5 py-1 bg-gray-100 text-gray-700 text-xs font-bold rounded-md">
-                  {team.status}
-                </span>
-                <span className="text-sm font-medium text-gray-500">조회수 142</span>
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-3">{team.title}</h3>
-              <div className="flex items-center gap-2">
-                <Code2 className="w-4 h-4 text-gray-400" />
-                {team.req.map(stack => (
-                  <span key={stack} className="px-2 py-0.5 bg-gray-50 border border-gray-100 text-gray-600 text-xs rounded-full">
-                    {stack}
-                  </span>
-                ))}
-              </div>
+    <div className="flex flex-col gap-4">
+      {teams.map((team) => (
+        <div key={team.id} className="glass-card p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 transition-all hover:bg-white hover:border-primary/20 hover:shadow-lg relative overflow-hidden group">
+          <div className="flex-1">
+            <div className="flex items-center gap-3 mb-3">
+              <span className="px-2.5 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black rounded-lg border border-emerald-100">
+                {team.status === 'recruiting' ? '모집중' : '모집완료'}
+              </span>
+              <span className="text-xs font-bold text-gray-400">
+                {team.activity?.organization || "자체 프로젝트"}
+              </span>
             </div>
+            
+            <h3 className="text-lg font-black text-gray-900 mb-2 group-hover:text-primary transition-colors">{team.title}</h3>
+            
+            {team.activity && (
+              <p className="text-xs text-gray-400 font-medium mb-4 flex items-center gap-1">
+                📅 {team.activity.title}
+              </p>
+            )}
 
-            <div className="flex flex-col items-end gap-3 min-w-[200px]">
-              <div className="flex flex-col items-end">
-                <span className="text-xs font-bold text-gray-500 mb-1">나와의 스펙 핏 (AI 매칭)</span>
-                {team.match >= 80 ? (
-                  <span className="flex items-center gap-1.5 text-lg font-extrabold text-green-600">
-                    <CheckCircle2 className="w-5 h-5" /> {team.match}% 적합
-                  </span>
-                ) : team.match >= 50 ? (
-                  <span className="flex items-center gap-1.5 text-lg font-extrabold text-orange-500">
-                    <ShieldAlert className="w-5 h-5" /> {team.match}% (보통)
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1.5 text-lg font-extrabold text-gray-400">
-                    {team.match}% (핏 낮음)
-                  </span>
-                )}
-              </div>
-              
-              <button className="w-full sm:w-auto px-4 py-2 border border-gray-200 bg-white hover:bg-gray-50 hover:text-primary transition-all rounded-lg text-sm font-bold flex justify-center items-center gap-2">
-                인증서 첨부하여 지원 <ChevronRight className="w-4 h-4" />
-              </button>
+            <div className="flex items-center gap-2">
+              <Code2 className="w-4 h-4 text-gray-400" />
+              {team.required_stacks?.map((stack: string) => (
+                <span key={stack} className="px-2 py-0.5 bg-gray-50 border border-gray-100 text-gray-500 text-[10px] font-bold rounded-lg group-hover:bg-primary/5 group-hover:text-primary transition-all">
+                  {stack}
+                </span>
+              ))}
             </div>
           </div>
-        ))}
-      </div>
+
+          <div className="flex flex-col items-end gap-3 min-w-[180px]">
+            <div className="flex flex-col items-end mb-1">
+              <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-1">Leader</span>
+              <span className="text-sm font-bold text-gray-700">{team.leader?.name || "익명"}</span>
+            </div>
+            
+            <button 
+              onClick={() => handleApply(team.id)}
+              className="w-full px-5 py-2.5 bg-gray-900 text-white hover:bg-primary transition-all rounded-xl text-xs font-black flex justify-center items-center gap-2 shadow-sm"
+            >
+              팀 합류 신청 <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+          
+          <div className="absolute top-0 right-0 w-24 h-24 bg-primary/2 rounded-full -mr-12 -mt-12 group-hover:bg-primary/5 transition-all" />
+        </div>
+      ))}
     </div>
   );
 }

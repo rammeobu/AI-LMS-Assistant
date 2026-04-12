@@ -40,3 +40,16 @@ def sync_crawled_data(batch_size: int = 5):
     loop = asyncio.get_event_loop()
     processed_count = loop.run_until_complete(_run())
     return f"Processed {processed_count} records."
+@celery_app.task(name="devstep.generate_roadmap")
+def generate_roadmap_task(roadmap_id: str, user_id: str):
+    """
+    백그라운드에서 AI 로드맵 생성을 수행합니다.
+    """
+    async def _run():
+        from app.services.roadmap import RoadmapService
+        service = RoadmapService()
+        await service.execute_background_generation(async_session_factory, roadmap_id, user_id)
+
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(_run())
+    return f"Roadmap generation task completed for {roadmap_id}"

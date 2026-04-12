@@ -12,7 +12,9 @@ export async function getAIMatchedActivities(targetJob: string, manualSkills?: s
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
+  const { data: { session } } = await supabase.auth.getSession()
+
+  if (!user || !session) {
     return { data: null, error: '인증된 유저가 아닙니다.' }
   }
 
@@ -21,6 +23,7 @@ export async function getAIMatchedActivities(targetJob: string, manualSkills?: s
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
       },
       body: JSON.stringify({
         user_id: user.id,

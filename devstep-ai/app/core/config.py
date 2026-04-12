@@ -21,7 +21,16 @@ class Settings(BaseSettings):
     )
 
     # ── Database (PostgreSQL / Supabase) ──
-    DATABASE_URL: str = "postgresql://devstep:devstep_local_2026@db:5432/devstep_db"
+    DB_MODE: str = "local"
+    LOCAL_DATABASE_URL: str = "postgresql://devstep:devstep_local_2026@db:5432/devstep_db"
+    SUPABASE_DATABASE_URL: str = ""
+
+    @property
+    def DATABASE_URL(self) -> str:
+        """DB_MODE에 따라 적절한 커넥션 스트링 반환"""
+        if self.DB_MODE.lower() == "supabase":
+            return self.SUPABASE_DATABASE_URL
+        return self.LOCAL_DATABASE_URL
 
     # ── Supabase Cloud ──
     SUPABASE_URL: str = ""
@@ -29,7 +38,13 @@ class Settings(BaseSettings):
 
     # ── OpenAI / AI Engine ──
     OPENAI_API_KEY: str = ""
-    GOOGLE_AI_API_KEY: str = ""
+    GOOGLE_API_KEY: str = ""
+
+    # ── Google Cloud / Vertex AI ──
+    GOOGLE_CLOUD_PROJECT: str = ""
+    GOOGLE_CLOUD_LOCATION: str = "asia-northeast3"
+    GOOGLE_GENAI_USE_VERTEXAI: bool = True
+    GOOGLE_APPLICATION_CREDENTIALS: str = ""
 
     # ── Redis (Celery broker) ──
     REDIS_URL: str = "redis://redis:6379/0"
@@ -50,4 +65,16 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     """싱글톤 Settings 인스턴스를 반환 (캐시)"""
-    return Settings()
+    s = Settings()
+    # SDK 자동 감지를 위해 환경 변수 주입
+    import os
+    if s.GOOGLE_API_KEY:
+        os.environ["GOOGLE_API_KEY"] = s.GOOGLE_API_KEY
+    if s.GOOGLE_CLOUD_PROJECT:
+        os.environ["GOOGLE_CLOUD_PROJECT"] = s.GOOGLE_CLOUD_PROJECT
+    if s.GOOGLE_CLOUD_LOCATION:
+        os.environ["GOOGLE_CLOUD_LOCATION"] = s.GOOGLE_CLOUD_LOCATION
+    if s.GOOGLE_APPLICATION_CREDENTIALS:
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = s.GOOGLE_APPLICATION_CREDENTIALS
+    os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = str(s.GOOGLE_GENAI_USE_VERTEXAI)
+    return s

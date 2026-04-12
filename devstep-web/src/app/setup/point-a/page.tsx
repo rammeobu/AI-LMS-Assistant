@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -33,7 +33,7 @@ import { analyzeGithubStackWithAI, checkGithubToken } from "@/app/actions/github
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 
-export default function UnifiedSurveyPage() {
+function UnifiedSurveyContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [currentStep, setCurrentStep] = useState(1);
@@ -51,6 +51,7 @@ export default function UnifiedSurveyPage() {
     status: [] as string[],
     experience: "",
     interests: [] as string[],
+    targetJob: "", // 주 목표 직무 (로드맵 생성 기준)
     
     // Point B Fields
     careerGaps: [] as string[], 
@@ -71,6 +72,7 @@ export default function UnifiedSurveyPage() {
             status: data.point_a?.current_focus || [],
             experience: data.point_a?.experience_level || "",
             interests: data.point_a?.interests || [],
+            targetJob: data.point_a?.target_job || "",
             careerGaps: data.point_b?.career_gaps || [],
             targetDomain: data.point_b?.target_domains || [],
             availableResource: data.point_b?.availability_resource || "미들형",
@@ -105,7 +107,7 @@ export default function UnifiedSurveyPage() {
       if (!tokenStatus.success) {
         // 토큰이 없으면 OAuth 유도
         const supabase = createClient();
-        await supabase.auth.signInWithOAuth({
+        await supabase.auth.linkIdentity({
           provider: 'github',
           options: {
             redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent('/setup/point-a?scan=true')}`,
@@ -189,7 +191,7 @@ export default function UnifiedSurveyPage() {
       case 1: return surveyData.skills.length > 0;
       case 2: return surveyData.baseline !== "" && surveyData.status.length > 0;
       case 3: return surveyData.experience !== "";
-      case 4: return surveyData.interests.length > 0;
+      case 4: return surveyData.interests.length > 0 && !!surveyData.targetJob;
       case 5: return surveyData.careerGaps.length > 0;
       case 6: return surveyData.targetDomain.length > 0;
       case 7: return surveyData.availableResource !== "";
@@ -435,36 +437,119 @@ export default function UnifiedSurveyPage() {
               )}
 
               {currentStep === 4 && (
-                <motion.div key="step4" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-12 flex-1">
+                <motion.div key="step4" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-10 flex-1">
                    <div className="flex items-center gap-4">
                     <div className="w-14 h-14 rounded-2xl bg-purple-500 flex items-center justify-center shadow-lg shadow-purple-500/20">
                       <Sparkles className="w-7 h-7 text-white" />
                     </div>
                     <div>
-                      <h2 className="text-2xl font-black text-gray-900">흥미 분야 선택</h2>
-                      <p className="text-gray-500 font-bold">당신의 심장이 가장 뜨겁게 뛰는 분야를 골라주세요.</p>
+                      <h2 className="text-2xl font-black text-gray-900">상세 관심 직무 선택</h2>
+                      <p className="text-gray-500 font-bold">도전하고 싶은 직무를 모두 선택해 주세요. (중복 선택 가능)</p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
+
+                  <div className="space-y-8">
                     {[
-                      { id: "backend", label: "웹 서버 / API", icon: Globe },
-                      { id: "infra", label: "SRE / 클라우드", icon: Cloud },
-                      { id: "ai", label: "AI 모델링 / 빅데이터", icon: Bot },
-                      { id: "game", label: "게임 제작 / 실시간", icon: Gamepad2 },
-                      { id: "sec", label: "정보보호 / 해킹방어", icon: Lock },
-                      { id: "mobile", label: "모바일 앱 / 크로스플랫폼", icon: Terminal },
-                    ].map((item) => {
-                      const Icon = item.icon;
-                      const isActive = surveyData.interests.includes(item.id);
-                      return (
-                        <button key={item.id} onClick={() => { setSurveyData(prev => ({ ...prev, interests: isActive ? prev.interests.filter(i => i !== item.id) : [...prev.interests, item.id] })); }}
-                          className={`flex flex-col items-center justify-center p-10 rounded-[32px] border-2 transition-all gap-6 group ${isActive ? "bg-primary border-primary text-white shadow-2xl shadow-primary/20 -translate-y-2" : "bg-white border-gray-100 text-gray-900 hover:border-primary/40 hover:bg-primary/5"}`}>
-                          <div className={`w-16 h-16 rounded-[24px] flex items-center justify-center transition-all ${isActive ? "bg-white/20 text-white" : "bg-gray-50 text-gray-400 group-hover:bg-primary/10 group-hover:text-primary"}`}><Icon className="w-8 h-8" /></div>
-                          <span className="text-sm font-black whitespace-nowrap">{item.label}</span>
-                        </button>
-                      );
-                    })}
+                      { 
+                        category: "개발/데이터", 
+                        jobs: ["백엔드 엔지니어", "프론트엔드 개발자", "AI 엔지니어", "데이터 분석가", "풀스택 개발자", "임베디드 SW"] 
+                      },
+                      { 
+                        category: "인프라/보안", 
+                        jobs: ["DevOps 엔지니어", "클라우드 아키텍트", "보안 컨설턴트", "서버 관리자", "DBA"] 
+                      },
+                      { 
+                        category: "기획/PM", 
+                        jobs: ["서비스 기획자", "프로덕트 오너 (PO)", "프로젝트 매니저 (PM)", "사업 기획"] 
+                      },
+                      { 
+                        category: "디자인", 
+                        jobs: ["UI/UX 디자이너", "프로덕트 디자이너", "인터랙션 디자이너", "그래픽 디자이너"] 
+                      }
+                    ].map((group) => (
+                      <div key={group.category} className="space-y-3">
+                        <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest px-1">{group.category}</h3>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                          {group.jobs.map((job) => {
+                            const isActive = surveyData.interests.includes(job);
+                            return (
+                              <button
+                                key={job}
+                                onClick={() => {
+                                  const newInterests = isActive 
+                                    ? surveyData.interests.filter(i => i !== job) 
+                                    : [...surveyData.interests, job];
+                                  
+                                  setSurveyData(prev => {
+                                    const next = { ...prev, interests: newInterests };
+                                    // 만약 직무가 1개라면 자동으로 주 목표로 설정
+                                    if (newInterests.length === 1) {
+                                      next.targetJob = newInterests[0];
+                                    } else if (newInterests.length === 0) {
+                                      next.targetJob = "";
+                                    }
+                                    return next;
+                                  });
+                                }}
+                                className={`flex items-center gap-3 p-4 rounded-2xl border-2 transition-all text-left ${
+                                  isActive 
+                                    ? "bg-primary border-primary text-white shadow-lg shadow-primary/10" 
+                                    : "bg-white border-gray-100 text-gray-600 hover:border-primary/30 hover:bg-gray-50"
+                                }`}
+                              >
+                                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${isActive ? "border-white" : "border-gray-200"}`}>
+                                  {isActive && <div className="w-2 h-2 bg-white rounded-full" />}
+                                </div>
+                                <span className="text-sm font-bold">{job}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
                   </div>
+
+                  {/* 주 목표 직무 선택 (관심 직무가 2개 이상일 때 노출) */}
+                  {surveyData.interests.length > 1 && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }} 
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mt-12 p-8 rounded-[32px] bg-primary/5 border-2 border-primary/20 space-y-6"
+                    >
+                      <div>
+                        <h3 className="text-xl font-extrabold text-gray-900 mb-1 flex items-center gap-2">
+                          <Target className="w-5 h-5 text-primary" />
+                          주 목표 직무 설정
+                        </h3>
+                        <p className="text-sm font-bold text-gray-500">
+                          위에서 선택하신 {surveyData.interests.length}개의 관심 분야 중, <strong>학습 로드맵을 생성할 주 목표</strong>를 하나만 선택해주세요.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap gap-3">
+                        {surveyData.interests
+                          .filter(job => [
+                            "백엔드 엔지니어", "프론트엔드 개발자", "AI 엔지니어", "데이터 분석가", "풀스택 개발자", "임베디드 SW",
+                            "DevOps 엔지니어", "클라우드 아키텍트", "보안 컨설턴트", "서버 관리자", "DBA",
+                            "서비스 기획자", "프로덕트 오너 (PO)", "프로젝트 매니저 (PM)", "사업 기획",
+                            "UI/UX 디자이너", "프로덕트 디자이너", "인터랙션 디자이너", "그래픽 디자이너"
+                          ].includes(job))
+                          .map((job) => (
+                          <button
+                            key={job}
+                            onClick={() => setSurveyData(prev => ({ ...prev, targetJob: job }))}
+                            className={`px-6 py-3 rounded-full text-sm font-black transition-all border-2 ${
+                              surveyData.targetJob === job 
+                                ? "bg-primary border-primary text-white shadow-lg shadow-primary/20 scale-105" 
+                                : "bg-white border-gray-100 text-gray-400 hover:border-primary/30 hover:text-primary"
+                            }`}
+                          >
+                            {job}
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
                 </motion.div>
               )}
 
@@ -658,5 +743,13 @@ export default function UnifiedSurveyPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function UnifiedSurveyPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center"><Loader2 className="w-10 h-10 text-primary animate-spin" /></div>}>
+      <UnifiedSurveyContent />
+    </Suspense>
   );
 }

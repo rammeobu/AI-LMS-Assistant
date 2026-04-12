@@ -7,6 +7,8 @@ import { recordAttendance, getAttendanceHistory } from "../app/actions/attendanc
 import { getUserCalendar } from "../app/actions/calendarActions";
 import { getTodos, addTodo, toggleTodo, deleteTodo } from "../app/actions/todoActions";
 
+
+
 export default function DashboardOverview() {
   const [heatmapData, setHeatmapData] = useState<number[]>(new Array(168).fill(0));
   const [stats, setStats] = useState({ daysSinceJoin: 1, streak: 0 });

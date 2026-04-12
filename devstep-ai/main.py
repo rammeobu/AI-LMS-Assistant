@@ -14,7 +14,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
-from app.api.endpoints import health, match
+from app.api.endpoints import health, match, roadmaps
 
 settings = get_settings()
 
@@ -24,10 +24,10 @@ settings = get_settings()
 async def lifespan(app: FastAPI):
     """애플리케이션 시작/종료 시 실행되는 이벤트"""
     # Startup
-    print(f"🚀 {settings.APP_TITLE} v{settings.APP_VERSION} starting...")
+    print(f"{settings.APP_TITLE} v{settings.APP_VERSION} starting...")
     yield
     # Shutdown
-    print("👋 Shutting down DevStep AI Worker...")
+    print("Shutting down DevStep AI Worker...")
 
 
 # ── FastAPI 인스턴스 생성 ──
@@ -50,3 +50,4 @@ app.add_middleware(
 # ── 라우터 등록 ──
 app.include_router(health.router)
 app.include_router(match.router, prefix="/api/v1/match", tags=["Matching"])
+app.include_router(roadmaps.router, prefix="/api/v1/roadmaps", tags=["Roadmap & LMS"])

@@ -19,6 +19,7 @@ from app.models.base import Base
 if TYPE_CHECKING:
     from app.models.onboarding import OnboardingSurvey
     from app.models.onboarding import Portfolio
+    from app.models.roadmap import Roadmap
 
 class User(Base):
     """
@@ -45,6 +46,7 @@ class User(Base):
     # Relationship
     onboarding_survey: Mapped["OnboardingSurvey"] = relationship("OnboardingSurvey", back_populates="user", uselist=False)
     portfolio: Mapped["Portfolio"] = relationship("Portfolio", back_populates="user", uselist=False)
+    roadmaps: Mapped[list["Roadmap"]] = relationship("Roadmap", back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email={self.email}, name={self.name})>"

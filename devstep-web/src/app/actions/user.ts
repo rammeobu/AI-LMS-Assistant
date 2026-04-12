@@ -123,7 +123,8 @@ export async function completeUnifiedOnboarding(formData: {
           academic_year: formData.baseline || "",
           current_focus: formData.status || [],
           experience_level: formData.experience || "",
-          interests: formData.interests || []
+          interests: formData.interests || [],
+          target_job: formData.targetJob || ""
         },
         point_b: {
           career_gaps: formData.careerGaps || [],
@@ -170,6 +171,24 @@ export async function completeUnifiedOnboarding(formData: {
   if (userError) {
     console.error('Onboarding update error:', userError.message)
     throw new Error('온보딩 완료 처리 실패')
+  }
+
+  // 4. AI 기반 로드맵 생성 트리거 (FastAPI 비동기 연동)
+  try {
+    const aiApiUrl = process.env.NEXT_PUBLIC_AI_API_URL || 'http://localhost:8000'
+    // 백엔드가 202 Accepted를 즉시 반환하므로 여기서의 await는 아주 짧은 시간만 소요됩니다.
+    await fetch(`${aiApiUrl}/api/v1/roadmaps/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: user.id,
+        target_job: formData.targetJob || "",
+        interests: formData.interests || []
+      })
+    })
+    console.log('AI Roadmap generation task triggered successfully')
+  } catch (aiError) {
+    console.warn('AI Roadmap trigger failed:', aiError)
   }
 
   revalidatePath('/', 'layout')
