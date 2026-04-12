@@ -47,8 +47,6 @@ def process_and_save_to_new_table():
 
     # 구글 최신 무료 모델 후보군
     models_to_try = [
-        'gemini-2.5-flash-lite', 
-        'gemini-2.5-flash',
         'gemini-3.1-flash-lite-preview'
     ]
 
