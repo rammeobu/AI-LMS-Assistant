@@ -1,7 +1,8 @@
 "use client";
 
-import { X, CalendarPlus, CheckCircle2, ShieldAlert, Code2, ChevronRight, Users, ExternalLink, MapPin, Calendar } from "lucide-react";
+import { X, CalendarPlus, CheckCircle2, ShieldAlert, Code2, ChevronRight, Users, ExternalLink, MapPin, Calendar, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { addActivityToCalendar } from "../app/actions/calendarActions";
 
 interface ActivityDetailDrawerProps {
   isOpen: boolean;
@@ -11,6 +12,8 @@ interface ActivityDetailDrawerProps {
 
 export default function ActivityDetailDrawer({ isOpen, onClose, activity }: ActivityDetailDrawerProps) {
   const [mounted, setMounted] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
+  const [isAdded, setIsAdded] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -18,16 +21,47 @@ export default function ActivityDetailDrawer({ isOpen, onClose, activity }: Acti
 
   useEffect(() => {
     if (isOpen) {
-      document.body.style.overflow = "hidden"; // Prevent background scrolling
+      document.body.style.overflow = "hidden";
+      setIsAdded(false); 
+      console.log("[Drawer] Opened with activity:", activity);
     } else {
       document.body.style.overflow = "auto";
     }
     return () => { document.body.style.overflow = "auto"; };
-  }, [isOpen]);
+  }, [isOpen, activity]);
 
   if (!mounted) return null;
 
-  // Mock Team Matching Data specifically for this activity
+  const handleAddToCalendar = async () => {
+    if (!activity?.id) {
+      console.error("[Drawer] ABORT - No activity ID found");
+      alert("활동 정보를 찾을 수 없습니다.");
+      return;
+    }
+    
+    if (isAdding || isAdded) return;
+    
+    console.log(`[Drawer] CLICK - Attempting to add crawlingId: ${activity.id}`);
+    setIsAdding(true);
+    
+    try {
+      const res = await addActivityToCalendar(Number(activity.id));
+      console.log("[Drawer] SERVER RESPONSE:", res);
+      
+      if (res.success) {
+        setIsAdded(true);
+      } else {
+        console.error("[Drawer] SERVER ERROR:", res.error);
+        alert(res.error || "일정 추가에 실패했습니다.");
+      }
+    } catch (err) {
+      console.error("[Drawer] UNEXPECTED CLIENT ERROR:", err);
+      alert("서버와 통신하는 중 오류가 발생했습니다.");
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
   const dummyTeams = [
     { title: `${activity?.title || ''} 스터디 및 토이 프로젝트 팀원 모집`, req: ["React", "Spring"], match: 85, status: "모집중 (1/4)" },
     { title: "같이 과제 공략하실 분 (매주 화요일 저녁)", req: ["Node.js"], match: 40, status: "모집중 (2/3)" },
@@ -36,16 +70,13 @@ export default function ActivityDetailDrawer({ isOpen, onClose, activity }: Acti
 
   return (
     <>
-      {/* Background Overlay (Dimmed Backdrop) */}
       <div
         className={`fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-[100] transition-opacity duration-300 ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
         onClick={onClose}
       />
 
-      {/* Slide-over Drawer Panel */}
       <div className={`fixed top-0 right-0 h-[100dvh] w-full max-w-2xl bg-white shadow-2xl z-[101] transform transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] flex flex-col overflow-y-auto ${isOpen ? "translate-x-0" : "translate-x-full"}`}>
 
-        {/* Sticky Header */}
         <div className="sticky top-0 bg-white/80 backdrop-blur-md border-b border-gray-100 px-6 py-4 flex justify-between items-center z-10">
           <span className="text-xs font-bold text-gray-400">Activity Details &amp; Team Matching</span>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
@@ -56,10 +87,8 @@ export default function ActivityDetailDrawer({ isOpen, onClose, activity }: Acti
         {activity && (
           <div className="p-6 md:p-8 flex flex-col gap-8">
 
-            {/* 1. Activity Profile Section */}
             <div className="flex flex-col md:flex-row gap-6 items-start">
               <div className="w-full md:w-48 h-48 rounded-2xl shrink-0 shadow-md" style={{ background: activity.gradient || 'linear-gradient(135deg, #f6d365, #fda085)' }}>
-                {/* Fallback pattern box */}
               </div>
 
               <div className="flex flex-col flex-1">
@@ -68,19 +97,16 @@ export default function ActivityDetailDrawer({ isOpen, onClose, activity }: Acti
                 </span>
                 <h2 className="text-2xl font-extrabold text-gray-900 leading-tight mb-2">{activity.title}</h2>
 
-                {/* Organization */}
                 {activity.organization && (
                   <p className="text-sm font-bold text-primary/70 mb-1">🏢 {activity.organization}</p>
                 )}
 
-                {/* Period */}
                 {activity.period && (
                   <p className="text-sm text-gray-500 font-medium flex items-center gap-1.5 mb-1">
                     <Calendar className="w-4 h-4" /> {activity.period}
                   </p>
                 )}
 
-                {/* Target */}
                 {activity.target && (
                   <p className="text-sm text-gray-500 font-medium flex items-center gap-1.5 mb-3">
                     <MapPin className="w-4 h-4" /> 대상: {activity.target}
@@ -98,14 +124,29 @@ export default function ActivityDetailDrawer({ isOpen, onClose, activity }: Acti
                       <ExternalLink className="w-4 h-4" /> 홈페이지 바로가기
                     </a>
                   )}
-                  <button className="flex-1 py-3 bg-primary/10 text-primary font-bold rounded-xl text-sm flex justify-center items-center gap-2 hover:bg-primary/20 transition-colors">
-                    <CalendarPlus className="w-4 h-4" /> 내 캘린더에 추가
+                  <button 
+                    id="add-to-calendar-btn"
+                    onClick={handleAddToCalendar}
+                    disabled={isAdding || isAdded}
+                    className={`flex-1 py-3 font-bold rounded-xl text-sm flex justify-center items-center gap-2 transition-all shadow-sm ${
+                      isAdded 
+                        ? "bg-emerald-50 text-emerald-600 border border-emerald-100 cursor-default" 
+                        : "bg-primary text-white hover:bg-primary/90"
+                    } disabled:opacity-70`}
+                  >
+                    {isAdding ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : isAdded ? (
+                      <CheckCircle2 className="w-4 h-4" />
+                    ) : (
+                      <CalendarPlus className="w-4 h-4" />
+                    )}
+                    {isAdding ? "추가 중..." : isAdded ? "캘린더에 추가됨" : "내 캘린더에 추가"}
                   </button>
                 </div>
               </div>
             </div>
 
-            {/* Description (from Supabase) */}
             {activity.description && (
               <div className="bg-gray-50 border border-gray-100 rounded-2xl p-6">
                 <h3 className="text-sm font-bold text-gray-900 mb-3">📄 상세 내용</h3>
@@ -115,7 +156,6 @@ export default function ActivityDetailDrawer({ isOpen, onClose, activity }: Acti
               </div>
             )}
 
-            {/* 2. AI Spec Fit Report */}
             <div className="bg-primary/5 border border-primary/20 rounded-2xl p-6">
               <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2 mb-4">
                 ✨ AI 스펙 핏 리포트
@@ -127,7 +167,6 @@ export default function ActivityDetailDrawer({ isOpen, onClose, activity }: Acti
 
             <hr className="border-gray-100" />
 
-            {/* 3. Team Up Board for this Activity */}
             <div>
               <div className="flex justify-between items-center mb-6">
                 <div>
@@ -145,7 +184,6 @@ export default function ActivityDetailDrawer({ isOpen, onClose, activity }: Acti
                 {dummyTeams.map((team, i) => (
                   <div key={i} className={`p-5 rounded-2xl border transition-all hover:shadow-md bg-white ${team.highlight ? "border-primary/40 ring-1 ring-primary/20" : "border-gray-100"}`}>
                     <div className="flex justify-between items-start gap-4">
-
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
                           <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-[10px] font-bold rounded">
@@ -179,7 +217,6 @@ export default function ActivityDetailDrawer({ isOpen, onClose, activity }: Acti
                           </span>
                         )}
                       </div>
-
                     </div>
 
                     <div className="mt-4 pt-4 border-t border-gray-50">

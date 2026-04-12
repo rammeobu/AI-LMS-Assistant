@@ -52,24 +52,36 @@ export async function getUserCalendar() {
 }
 
 /**
- * 2. 캘린더에 활동 추가
+ * 2. 캘린더에 활동 추가 (상세 로깅 버전)
  */
 export async function addActivityToCalendar(crawlingId: number) {
+  console.log(`\n[LOG][START] --- addActivityToCalendar ---`);
+  console.log(`[LOG][ID] crawlingId = ${crawlingId}`);
+  
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) return { success: false, error: "로그인이 필요합니다." }
+  if (!user) {
+    console.error("[LOG][ERROR] No auth user found");
+    return { success: false, error: "로그인이 필요합니다." };
+  }
+  console.log(`[LOG][USER] ID: ${user.id}, Email: ${user.email}`);
 
   try {
+    // 1. crawling_data에서 원본 데이터 조회
     const { data: crawl, error: crawlErr } = await supabase
       .from('crawling_data')
       .select('*')
       .eq('id', crawlingId)
       .single();
 
-    if (crawlErr || !crawl) return { success: false, error: "데이터를 찾을 수 없습니다." };
+    if (crawlErr || !crawl) {
+      console.error(`[LOG][ERROR] Crawl data fetch failed (ID: ${crawlingId}):`, crawlErr?.message);
+      return { success: false, error: "데이터를 찾을 수 없습니다." };
+    }
+    console.log(`[LOG][FETCH] Found title: ${crawl.title}`);
 
-    // 100% 매칭을 위해 ID 혹은 제목으로 기존 데이터 체크
+    // 2. user_activities에 이미 있는지 확인 (중복 생성 방지)
     let { data: existingActivity } = await supabase
       .from('user_activities')
       .select('id')
@@ -79,6 +91,7 @@ export async function addActivityToCalendar(crawlingId: number) {
     let activityUuid = existingActivity?.id;
 
     if (!activityUuid) {
+      console.log(`[LOG][CREATE] New record needed for user_activities`);
       const safeStartDate = (crawl.start_date && crawl.start_date.trim() !== "") ? crawl.start_date : null;
       const safeDeadline = (crawl.end_date && crawl.end_date.trim() !== "") ? crawl.end_date : null;
 
@@ -97,26 +110,41 @@ export async function addActivityToCalendar(crawlingId: number) {
         .select('id')
         .single();
 
-      if (insertError) return { success: false, error: insertError.message };
+      if (insertError) {
+        console.error("[LOG][ERROR] insertUserActivity failed:", insertError.message);
+        return { success: false, error: insertError.message };
+      }
       activityUuid = newActivity.id;
+      console.log(`[LOG][CREATED] activityUuid = ${activityUuid}`);
+    } else {
+      console.log(`[LOG][EXISTS] activityUuid = ${activityUuid}`);
     }
 
+    // 3. user_calendar 테이블에 연결 (upsert)
+    console.log(`[LOG][LINK] Connecting user to activity...`);
     const { error: linkError } = await supabase
       .from('user_calendar')
       .upsert([{ user_id: user.id, activity_id: activityUuid }], { onConflict: 'user_id,activity_id' });
 
-    if (linkError) return { success: false, error: linkError.message };
+    if (linkError) {
+      console.error("[LOG][ERROR] user_calendar upsert failed:", linkError.message);
+      return { success: false, error: linkError.message };
+    }
 
+    console.log(`[LOG][SUCCESS] All steps completed.`);
     revalidatePath('/dashboard');
     return { success: true, activityUuid };
 
   } catch (err: any) {
-    return { success: false, error: "서버 오류" };
+    console.error("[LOG][CRITICAL] Unexpected server error:", err);
+    return { success: false, error: "서버 오류가 발생했습니다." };
+  } finally {
+    console.log(`[LOG][END] ---------------------------\n`);
   }
 }
 
 /**
- * 3. AI 대외활동 추천 결과 가져오기 (초강력 하이브리드 필터)
+ * 3. AI 대외활동 추천 결과 가져오기
  */
 export async function getAIRecommendations() {
   const supabase = await createClient()
@@ -137,8 +165,6 @@ export async function getAIRecommendations() {
           if (item.activity?.crawling_id) savedIds.push(Number(item.activity.crawling_id));
           if (item.activity?.title) savedTitles.push(item.activity.title.trim().toLowerCase());
       });
-
-      console.log(`[getAIRecommendations] User has ${savedIds.length} IDs and ${savedTitles.length} Titles bookmarked.`);
     }
 
     const { data: processedList, error: fetchError } = await supabase
@@ -149,14 +175,11 @@ export async function getAIRecommendations() {
       return await getFinalFallback(supabase, savedIds, savedTitles);
     }
 
-    // [핵심] 하이브리드 필터링: ID 혹은 제목이 겹치면 무조건 탈락
     const filteredList = processedList.filter((item: any) => {
       const matchId = savedIds.includes(Number(item.crawling_id));
       const matchTitle = savedTitles.includes(item.title?.trim().toLowerCase());
       return !matchId && !matchTitle;
     });
-
-    console.log(`[getAIRecommendations] Hybrid filter done. ${filteredList.length} items remain.`);
 
     if (filteredList.length === 0) {
         return await getFinalFallback(supabase, savedIds, savedTitles);
