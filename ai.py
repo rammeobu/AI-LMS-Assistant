@@ -39,7 +39,6 @@ def process_and_save_to_new_table():
     response = supabase.table("crawling_data") \
         .select("id, title, description, ai_processed_data!left(crawling_id)") \
         .is_("ai_processed_data.crawling_id", "null") \
-        .limit(5) \
         .execute()
     
     unprocessed_items = response.data

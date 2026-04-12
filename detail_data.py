@@ -120,10 +120,6 @@ def _parse_activity(soup: BeautifulSoup, activity_id: int) -> dict | None:
 
 
 def crawl_activities(activity_ids: list[int]) -> list[dict]:
-    """
-    수집된 activity_ids 를 받아 상세 페이지를 파싱한다.
-    결과 list[dict] 를 반환하고 JSON 저장까지 수행한다.
-    """
     print(f"\n🔎 상세 크롤링 시작 — 대상 {len(activity_ids)}개")
     all_data: list[dict] = []
 
@@ -145,17 +141,21 @@ def crawl_activities(activity_ids: list[int]) -> list[dict]:
         """)
         page = context.new_page()
 
-        try:
-            for idx, activity_id in enumerate(activity_ids, start=1):
+        # 💡 수정된 부분: for문이 먼저 시작하고, 그 안에서 try-except로 개별 데이터를 방어합니다!
+        for idx, activity_id in enumerate(activity_ids, start=1):
+            try:
                 print(f"  🔍 [{idx}/{len(activity_ids)}] ID={activity_id}")
 
                 page.goto("about:blank")
                 page.wait_for_timeout(300)
+                
                 page.goto(
                     f"https://linkareer.com/activity/{activity_id}",
                     timeout=60000,
                 )
-                page.wait_for_load_state("networkidle", timeout=60000)
+                
+                # 💡 수정된 부분: networkidle 대신 domcontentloaded 사용 (타임아웃 획기적 감소)
+                page.wait_for_load_state("domcontentloaded", timeout=60000)
                 page.wait_for_timeout(2500)
 
                 for _ in range(2):
@@ -175,13 +175,14 @@ def crawl_activities(activity_ids: list[int]) -> list[dict]:
                 print(f"  ✅ 「{entry['제목']}」")
                 time.sleep(random.uniform(1.5, 3.5))
 
-        except Exception as e:
-            print(f"❌ 상세 크롤링 오류: {e}")
-        finally:
-            browser.close()
+            except Exception as e:
+                # 💡 특정 페이지가 터져도 스킵하고 24번, 25번으로 계속 넘어갑니다.
+                print(f"  ❌ ID={activity_id} 에러 발생 (스킵하고 계속 진행): {e}")
+                continue
+
+        browser.close()
 
     if all_data:
-        # 포스터URL이 제거된 컬럼 순서
         col_order = ["ID", "수집일시", "기관", "제목", "주제",
                      "시작일", "마감일", "대상", "홈페이지", "상세내용"]
         ordered_data = [
