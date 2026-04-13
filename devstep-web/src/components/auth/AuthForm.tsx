@@ -113,14 +113,6 @@ export default function AuthForm() {
 
       <div className="flex flex-col gap-3 mb-8">
         {/* Social Buttons */}
-        <button 
-          onClick={() => handleOAuth('kakao')}
-          disabled={isLoading !== null}
-          className="w-full relative flex items-center justify-center p-4 bg-[#FEE500] hover:bg-[#FDD800] text-[#191919] font-bold rounded-2xl transition-all shadow-sm active:scale-[0.98] disabled:opacity-70 group"
-        >
-          {isLoading === 'kakao' ? <Loader2 className="w-5 h-5 animate-spin" /> : '카카오로 시작하기'}
-        </button>
-
         <div className="grid grid-cols-2 gap-3">
           <button 
             onClick={() => handleOAuth('github')}
