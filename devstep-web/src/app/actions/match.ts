@@ -3,20 +3,23 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 
-const AI_BACKEND_URL = process.env.NEXT_PUBLIC_AI_API_URL || 'http://localhost:8000'
+// 서버 사이드 통신을 위한 내부 주소 설정
+const AI_BACKEND_URL = process.env.INTERNAL_AI_API_URL || 'http://devstep-ai:8000';
 
 /**
  * AI 매칭 엔진(FastAPI)을 호출하여 유저 맞춤형 대외활동 추천을 가져옵니다.
  */
 export async function getAIMatchedActivities(targetJob: string, manualSkills?: string[]) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
+  
+  // [Optimization] getUser() 호출을 제거하고 세션 정보만 빠르게 확보
   const { data: { session } } = await supabase.auth.getSession()
 
-  if (!user || !session) {
+  if (!session || !session.user) {
     return { data: null, error: '인증된 유저가 아닙니다.' }
   }
+
+  const user = session.user;
 
   try {
     const response = await fetch(`${AI_BACKEND_URL}/api/v1/match/activities`, {
