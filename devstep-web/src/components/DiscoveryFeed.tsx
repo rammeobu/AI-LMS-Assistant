@@ -63,9 +63,9 @@ function guessTags(subject: string | null, title: string): string[] {
   const tags: string[] = [];
   const text = `${subject || ""} ${title}`.toLowerCase();
 
-  if (text.includes("공모전") || text.includes("대회") || text.includes("챌린지")) tags.push("공모전");
+  if (text.includes("공모전") || text.includes("대회") || text.includes("챌린지") || text.includes("경진대회")) tags.push("공모전/경진대회");
   if (text.includes("해커톤")) tags.push("해커톤");
-  if (text.includes("대외활동") || text.includes("봉사")) tags.push("대외활동");
+  if (text.includes("학술대회")) tags.push("학술대회");
   if (text.includes("인턴") || text.includes("채용")) tags.push("채용/인턴");
   if (text.includes("교육") || text.includes("부트캠프") || text.includes("캠프")) tags.push("교육");
   if (text.includes("장학") || text.includes("지원")) tags.push("지원사업");
@@ -126,8 +126,8 @@ export default function DiscoveryFeed() {
     const tags = guessTags(item.subject, item.title);
     const matchesFilter =
       activeFilter === "전체" ||
-      (activeFilter === "공모전" && tags.some((t) => ["공모전", "해커톤"].includes(t))) ||
-      (activeFilter === "대외활동" && tags.some((t) => ["대외활동", "서포터즈"].includes(t))) ||
+      (activeFilter === "공모전/경진대회" && tags.some((t) => ["공모전/경진대회", "해커톤"].includes(t))) ||
+      (activeFilter === "학술대회" && tags.some((t) => ["학술대회"].includes(t))) ||
       (activeFilter === "교육/지원" && tags.some((t) => ["교육", "지원사업", "채용/인턴"].includes(t)));
 
     return matchesSearch && matchesFilter;
@@ -171,7 +171,7 @@ export default function DiscoveryFeed() {
     setIsDrawerOpen(true);
   };
 
-  const FILTER_BUTTONS = ["전체", "공모전", "대외활동", "교육/지원"];
+  const FILTER_BUTTONS = ["전체", "공모전/경진대회", "학술대회", "교육/지원"];
 
   /* ── Loading state ── */
   if (loading) {
