@@ -101,14 +101,14 @@ class MatchingService:
 
     async def match(
         self,
-        db: AsyncSession,
+        db_factory, # Task 1: 커넥션 고갈 방지를 위해 세션 팩토리를 주입받음
         user_id: str,
         target_job: str,
         manual_skills: list[str] | None = None,
         top_k: int = 5,
     ) -> MatchResult:
         """
-        Supabase 설문 기반 RAG 매칭 파이프라인
+        Supabase 설문 기반 RAG 매칭 파이프라인 (DB Connection Starvation Fix Ver.)
         """
         start_total = time.time()
         
@@ -117,13 +117,15 @@ class MatchingService:
             skills_to_use = manual_skills
         else:
             logger.info(f"유저({user_id})의 온보딩 설문 데이터를 조회합니다.")
-            skills_to_use = await self._get_survey_skills(db, user_id)
+            # [DB Step 1] 유저 스킬 조회 (단기 세션)
+            async with db_factory() as db:
+                skills_to_use = await self._get_survey_skills(db, user_id)
             
         if not skills_to_use:
             logger.warning(f"유저({user_id})의 기술 스택 정보가 없습니다.")
             return MatchResult(normalized_skills=[], matches=[])
 
-        # 2. 정규화 (Input Hook)
+        # 2. 정규화 (Input Hook) - [AI Step 1] (DB 커넥션 미사용)
         start_step1 = time.time()
         logger.info("파이프라인 Step 1: 기술 스택 정규화 시작")
         normalized = await preprocess_query(skills_to_use, self._client)
@@ -133,9 +135,12 @@ class MatchingService:
         start_step2 = time.time()
         logger.info(f"파이프라인 Step 2: {self._dim}차원 임베딩 및 DB 검색 (top_k=10)")
         combined_text = ", ".join(normalized)
+        # [AI Step 2] 임베딩 생성 (DB 커넥션 미사용)
         vector = await self._get_embedding(combined_text)
-        # Task 2: 후보군 축소 (20 -> 10)
-        candidates = await self._fetch_candidates(db, vector, top_k=10)
+        
+        # [DB Step 2] 후보군 검색 (단기 세션)
+        async with db_factory() as db:
+            candidates = await self._fetch_candidates(db, vector, top_k=10)
         logger.info(f"파이프라인 Step 2 완료 (소요시간: {time.time() - start_step2:.4f}s)")
         
         if not candidates:

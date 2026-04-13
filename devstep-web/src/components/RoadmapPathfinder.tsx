@@ -503,10 +503,16 @@ export default function RoadmapPathfinder() {
                     </h4>
                     
                     {isAILoading ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {[1, 2].map((i) => (
-                          <div key={i} className="bg-gray-50 border border-gray-100 p-5 rounded-xl h-44 animate-pulse" />
-                        ))}
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-3 p-4 bg-primary/5 rounded-xl border border-primary/10 animate-pulse">
+                          <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                          <p className="text-sm font-bold text-primary">Gemini AI가 이 마일스톤에 최적인 맞춤 활동을 분석하여 매칭 중입니다...</p>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {[1, 2].map((i) => (
+                            <div key={i} className="bg-gray-50 border border-gray-100 p-5 rounded-xl h-44 animate-pulse" />
+                          ))}
+                        </div>
                       </div>
                     ) : aiActivities.length > 0 ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

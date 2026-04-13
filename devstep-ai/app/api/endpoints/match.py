@@ -72,7 +72,7 @@ async def match_activities(
 ) -> MatchResponse:
     try:
         result = await _matching_service.match(
-            db=db,
+            db_factory=async_session_factory, # 단일 세션 대신 팩토리를 전달하여 필요할 때만 커넥션을 쓰게 함
             user_id=body.user_id,
             target_job=body.target_job,
             manual_skills=body.skills,
