@@ -159,8 +159,8 @@ export default function CalendarSync() {
                 {isSyncing ? <Loader2 className="w-5 h-5 text-white animate-spin" /> : <CalendarIcon className="w-5 h-5 text-white" />}
               </div>
               <div>
-                <h2 className="text-2xl font-extrabold text-gray-900 tracking-tight">{currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월</h2>
-                <span className="text-xs font-bold text-gray-500">DevStep AI 캘린더 매칭</span>
+                <h2 className="text-4xl font-extrabold text-gray-900 tracking-tight">{currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월</h2>
+                <span className="text-base font-bold text-gray-500">DevStep AI 캘린더 매칭</span>
               </div>
             </div>
             <div className="flex gap-2">
@@ -212,7 +212,7 @@ export default function CalendarSync() {
                    <div key={rec.id} className="bg-white border-2 border-transparent shadow-[0_2px_10px_rgba(0,0,0,0.02)] rounded-3xl p-5 hover:border-purple-200 hover:shadow-xl hover:shadow-purple-500/10 transition-all duration-300 group flex flex-col cursor-pointer">
                     <div className="flex justify-between items-start mb-3"><span className="text-[10px] font-extrabold px-2 py-1 bg-gray-50 border border-gray-100 text-gray-600 rounded-lg">{rec.category}</span></div>
                     <h4 className="font-extrabold text-gray-900 text-sm leading-snug mb-2 group-hover:text-purple-600 transition-colors">{rec.title}</h4>
-                    <span className="flex items-center gap-1.5 text-[11px] font-bold text-gray-400 mb-4 truncate text-pink-500"><CalendarIcon className="w-3.5 h-3.5" /> 마감: {rec.date}</span>
+                    <span className="flex items-center gap-1.5 text-[11px] font-bold text-gray-400 mb-4 truncate text-pink-500"><CalendarIcon className="w-3.5 h-3.5" /> {rec.date}</span>
                     <div className="mt-auto"><button disabled={isSyncing} onClick={() => handleAddToCalendar(rec)} className="w-full py-2.5 bg-gray-900 text-white text-xs font-black rounded-xl hover:bg-primary transition-all flex items-center justify-center gap-1.5 active:scale-95"><Plus className="w-4 h-4" /> 캘린더에 쏙 담기</button></div>
                   </div>
                 ))
@@ -223,11 +223,11 @@ export default function CalendarSync() {
         <div className="lg:col-span-1 h-full flex flex-col gap-4">
           <div className="glass-card p-6 bg-gray-900 border-none shadow-md overflow-hidden relative">
             <div className="absolute top-0 right-0 w-32 h-32 bg-primary blur-[50px] opacity-20 rounded-full" />
-            <h3 className="text-3xl font-extrabold text-white mb-1 tracking-tight">{selectedDate.getMonth() + 1}월 {selectedDate.getDate()}일</h3>
+            <h3 className="text-3xl font-extrabold text-black mb-1 tracking-tight">{selectedDate.getMonth() + 1}월 {selectedDate.getDate()}일</h3>
             <p className="text-gray-400 text-sm font-medium">오늘 총 {selectedEvents.length}개의 일정이 있습니다.</p>
           </div>
           <div className="glass-card p-6 flex-1 border border-gray-100 shadow-sm flex flex-col">
-            <h4 className="font-bold text-gray-900 text-base mb-6">스케줄 타임라인</h4>
+            <h4 className="font-bold text-gray-900 text-xl text-center mb-6">스케줄 타임라인</h4>
             {selectedEvents.length > 0 ? (
               <div className="relative flex flex-col gap-5">
                 <div className="absolute left-[9px] top-4 bottom-4 w-[2px] bg-gray-100 z-0" />

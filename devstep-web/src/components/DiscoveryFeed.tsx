@@ -20,7 +20,22 @@ interface CrawlingData {
   created_at: string | null;
 }
 
-/* ───────── Helpers ───────── */
+const PASTEL_COLORS = [
+  "#fff1f2", // rose-50
+  "#fff7ed", // orange-50
+  "#fffbeb", // amber-50
+  "#f0fdf4", // green-50
+  "#ecfdf5", // emerald-50
+  "#f0fdfa", // teal-50
+  "#ecfeff", // cyan-50
+  "#eff6ff", // blue-50
+  "#eef2ff", // indigo-50
+  "#f5f3ff", // violet-50
+  "#faf5ff", // purple-50
+  "#fdf4ff", // fuchsia-50
+  "#fdf2f8", // pink-50
+];
+
 const GRADIENTS = [
   "linear-gradient(135deg, #f6d365, #fda085)",
   "linear-gradient(135deg, #84fab0, #8fd3f4)",
@@ -276,6 +291,7 @@ export default function DiscoveryFeed() {
             onClick={() => handleCardClick(item)}
             className={`glass-card group cursor-pointer hover:shadow-lg transition-all hover:-translate-y-1 relative flex flex-col overflow-hidden ${viewMode === "poster" ? "h-[320px] p-0" : "p-6 h-full gap-3"
               }`}
+            style={viewMode === "card" ? { backgroundColor: PASTEL_COLORS[i % PASTEL_COLORS.length] } : undefined}
           >
             {/* Poster Mode Styling */}
             {viewMode === "poster" && (

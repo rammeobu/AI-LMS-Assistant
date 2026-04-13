@@ -69,7 +69,7 @@ function NavbarContent() {
             <Link 
               key={item.id} 
               href={item.href} 
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-sm transition-all duration-200 select-none ${
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-base transition-all duration-200 select-none ${
                 isActive 
                   ? "bg-gray-100/70 text-primary font-bold shadow-inner ring-1 ring-gray-200/50 translate-y-[1px]" 
                   : "text-gray-500 font-medium hover:bg-gray-50 hover:text-gray-900"
