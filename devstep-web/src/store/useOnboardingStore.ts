@@ -5,7 +5,6 @@ interface OnboardingState {
   formData: {
     name: string
     region: string
-    interest_role: string
     skills: string[]
   }
   setStep: (step: number) => void
@@ -21,7 +20,6 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
   formData: {
     name: '',
     region: '',
-    interest_role: '',
     skills: [],
   },
   setStep: (step) => set({ step }),
@@ -43,7 +41,6 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
     formData: {
       name: '',
       region: '',
-      interest_role: '',
       skills: [],
     },
   }),

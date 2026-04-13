@@ -174,21 +174,25 @@ export async function completeUnifiedOnboarding(formData: {
   }
 
   // 4. AI 기반 로드맵 생성 트리거 (FastAPI 비동기 연동)
-  try {
-    const aiApiUrl = process.env.NEXT_PUBLIC_AI_API_URL || 'http://localhost:8000'
-    // 백엔드가 202 Accepted를 즉시 반환하므로 여기서의 await는 아주 짧은 시간만 소요됩니다.
-    await fetch(`${aiApiUrl}/api/v1/roadmaps/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        user_id: user.id,
-        target_job: formData.targetJob || "",
-        interests: formData.interests || []
+  // [Refactor] targetJob이 있는 경우(정밀 진단 완료 시)에만 로드맵 생성을 트리거합니다.
+  if (formData.targetJob || (formData.interests && formData.interests.length > 0)) {
+    try {
+      const aiApiUrl = process.env.NEXT_PUBLIC_AI_API_URL || 'http://localhost:8000'
+      const targetJob = formData.targetJob || (formData.interests && formData.interests[0]) || ""
+      
+      await fetch(`${aiApiUrl}/api/v1/roadmaps/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: user.id,
+          target_job: targetJob,
+          interests: formData.interests || []
+        })
       })
-    })
-    console.log('AI Roadmap generation task triggered successfully')
-  } catch (aiError) {
-    console.warn('AI Roadmap trigger failed:', aiError)
+      console.log('AI Roadmap generation task triggered successfully')
+    } catch (aiError) {
+      console.warn('AI Roadmap trigger failed:', aiError)
+    }
   }
 
   revalidatePath('/', 'layout')
