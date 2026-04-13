@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { getOnboardingSurvey } from "@/app/actions/user";
 import { useAIMatching } from "@/hooks/useAIMatching";
+import { addActivityToCalendar } from "@/app/actions/calendarActions";
 import { 
   CheckCircle2, 
   CalendarPlus, 
@@ -27,6 +28,10 @@ import remarkGfm from "remark-gfm";
 export default function RoadmapPathfinder() {
   const [selectedJob, setSelectedJob] = useState("");
   const [isSubTasksExpanded, setIsSubTasksExpanded] = useState(false);
+  
+  // Calendar Integration States
+  const [isAddingCalendarId, setIsAddingCalendarId] = useState<number | null>(null);
+  const [addedActivities, setAddedActivities] = useState<Set<number>>(new Set());
 
   // AI Roadmap Data States
   const [roadmap, setRoadmap] = useState<any>(null);
@@ -117,6 +122,33 @@ export default function RoadmapPathfinder() {
         }));
         return newRoadmap;
       });
+    }
+  };
+
+  const handleAddToCalendar = async (activity_id: number, title: string) => {
+    if (addedActivities.has(activity_id) || isAddingCalendarId === activity_id) return;
+    
+    setIsAddingCalendarId(activity_id);
+    try {
+      const res = await addActivityToCalendar(activity_id);
+      if (res.success) {
+        setAddedActivities(prev => {
+          const next = new Set(prev);
+          next.add(activity_id);
+          return next;
+        });
+        
+        // 스마트 캘린더 실시간 업데이트를 위한 이벤트 발송
+        window.dispatchEvent(new CustomEvent('devstep:calendar-update'));
+        
+        alert(`"${title}" 활동이 나의 캘린더(대시보드)에 성공적으로 추가되었습니다.`);
+      } else {
+        alert(res.error || "일정 추가에 실패했습니다.");
+      }
+    } catch (err) {
+      alert("서버와 통신하는 중 오류가 발생했습니다.");
+    } finally {
+      setIsAddingCalendarId(null);
     }
   };
 
@@ -504,8 +536,28 @@ export default function RoadmapPathfinder() {
                              <p className="text-xs text-gray-500 mb-5 flex-1 font-medium bg-gray-50 p-3 rounded-lg border border-gray-100 line-clamp-3">
                                {activity.reason}
                              </p>
-                             <button className="w-full py-2.5 bg-white hover:bg-primary hover:text-white text-gray-700 transition-colors rounded-lg text-sm font-bold flex items-center justify-center gap-2 border border-gray-200 shadow-sm hover:border-primary">
-                               <CalendarPlus className="w-4 h-4" /> 캘린더에 일정 추가
+                             <button 
+                                onClick={() => handleAddToCalendar(activity.activity_id, activity.title)}
+                                disabled={isAddingCalendarId === activity.activity_id || addedActivities.has(activity.activity_id)}
+                                className={`w-full py-2.5 transition-all rounded-lg text-sm font-bold flex items-center justify-center gap-2 border shadow-sm ${
+                                  addedActivities.has(activity.activity_id)
+                                    ? "bg-emerald-50 text-emerald-600 border-emerald-100 cursor-default"
+                                    : "bg-white hover:bg-primary hover:text-white text-gray-700 border-gray-200 hover:border-primary active:scale-[0.98]"
+                                }`}
+                             >
+                               {isAddingCalendarId === activity.activity_id ? (
+                                 <Loader2 className="w-4 h-4 animate-spin" />
+                               ) : addedActivities.has(activity.activity_id) ? (
+                                 <CheckCircle2 className="w-4 h-4" />
+                               ) : (
+                                 <CalendarPlus className="w-4 h-4" />
+                               )}
+                               {isAddingCalendarId === activity.activity_id 
+                                 ? "추가 중..." 
+                                 : addedActivities.has(activity.activity_id) 
+                                   ? "캘린더에 추가됨" 
+                                   : "캘린더에 일정 추가"
+                               }
                              </button>
                           </div>
                         ))}

@@ -22,6 +22,18 @@ export default function CalendarSync() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
 
+  const refreshCalendarEvents = async () => {
+    const calResult = await getUserCalendar();
+    if (calResult.success && calResult.data) {
+      const normalizedEvents = calResult.data.map((item: any) => ({
+        ...item,
+        fullDate: formatDateKey(item.deadline || item.addedAt || new Date()),
+        isSaved: true
+      }));
+      setCalendarEvents(normalizedEvents);
+    }
+  };
+
   const loadInitialData = async () => {
     setIsLoading(true);
     try {
@@ -37,7 +49,8 @@ export default function CalendarSync() {
       if (calResult.success && calResult.data) {
         const normalizedEvents = calResult.data.map((item: any) => ({
           ...item,
-          fullDate: formatDateKey(item.deadline), // 마감일에 표시
+          // 마감일(deadline)이 없으면 담은 날짜(addedAt)를 기준으로 표시하여 누락 방지
+          fullDate: formatDateKey(item.deadline || item.addedAt || new Date()),
           isSaved: true
         }));
         setCalendarEvents(normalizedEvents);
@@ -50,6 +63,17 @@ export default function CalendarSync() {
 
   useEffect(() => {
     loadInitialData();
+
+    // 실시간 업데이트를 위한 이벤트 리스너 등록 (캘린더 이벤트만 갱신)
+    const handleUpdate = () => {
+      console.log("[CalendarSync] Sync event received. Refreshing calendar events...");
+      refreshCalendarEvents();
+    };
+    window.addEventListener('devstep:calendar-update', handleUpdate);
+    
+    return () => {
+      window.removeEventListener('devstep:calendar-update', handleUpdate);
+    };
   }, []);
 
   const generateCalendarDays = () => {
@@ -90,18 +114,11 @@ export default function CalendarSync() {
 
     alert(`"${rec.title}" 활동이 캘린더에 성공적으로 담겼습니다!`);
     
-    // UI 반영 (마감일에 표시)
+    // 추천 목록에서 제거
     setRecommendations(prev => prev.filter(r => r.title !== rec.title));
-    setCalendarEvents(prev => [...prev, {
-      id: activityUuid || rec.id,
-      fullDate: rec.raw_end_date || formatDateKey(selectedDate),
-      type: "career",
-      title: rec.title,
-      time: "협의",
-      tag: rec.category || "추천",
-      isSaved: true,
-      color: "bg-purple-100 text-purple-700 border-purple-300 shadow-sm"
-    }]);
+    
+    // 서버에서 캘린더 이벤트만 다시 가져와 갱신 (추천 목록은 유지)
+    await refreshCalendarEvents();
   };
 
   const getEventsForDate = (date: Date) => {

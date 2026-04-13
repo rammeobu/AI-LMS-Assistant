@@ -68,45 +68,68 @@ export async function addActivityToCalendar(crawlingId: number) {
   console.log(`[LOG][USER] ID: ${user.id}, Email: ${user.email}`);
 
   try {
-    // 1. crawling_data에서 원본 데이터 조회
-    const { data: crawl, error: crawlErr } = await supabase
+    // 1. 원본 데이터 조회 (crawling_data 우선, 실패 시 activities 폴백)
+    let { data: crawl, error: crawlErr } = await supabase
       .from('crawling_data')
       .select('*')
       .eq('id', crawlingId)
-      .single();
+      .maybeSingle();
 
-    if (crawlErr || !crawl) {
-      console.error(`[LOG][ERROR] Crawl data fetch failed (ID: ${crawlingId}):`, crawlErr?.message);
-      return { success: false, error: "데이터를 찾을 수 없습니다." };
+    let normalizedData = null;
+
+    if (crawl) {
+      console.log(`[LOG][FETCH] Found in crawling_data: ${crawl.title}`);
+      normalizedData = {
+        title: crawl.title?.trim(),
+        type: crawl.category || crawl.subject || "대외활동",
+        provider: crawl.organization || "알 수 없음",
+        start_date: (crawl.start_date && crawl.start_date.trim() !== "") ? crawl.start_date : null,
+        deadline: (crawl.end_date && crawl.end_date.trim() !== "") ? crawl.end_date : null,
+        url: crawl.homepage || null,
+        content: crawl.description || null,
+        crawling_id: crawlingId
+      };
+    } else {
+      // 1-2. activities 테이블에서 폴백 조회
+      console.log(`[LOG][FALLBACK] Not found in crawling_data. Checking activities table (ID: ${crawlingId})...`);
+      const { data: act, error: actErr } = await supabase
+        .from('activities')
+        .select('*')
+        .eq('activity_id', crawlingId)
+        .maybeSingle();
+      
+      if (actErr || !act) {
+        console.error(`[LOG][ERROR] Data not found in both tables (ID: ${crawlingId}):`, actErr?.message);
+        return { success: false, error: "데이터를 찾을 수 없습니다." };
+      }
+
+      console.log(`[LOG][FETCH] Found in activities: ${act.title}`);
+      normalizedData = {
+        title: act.title?.trim(),
+        type: act.category || act.source_type || "추천 활동",
+        provider: act.source_type || "AI 추천",
+        start_date: null,
+        deadline: act.deadline || null,
+        url: act.source_url || null,
+        content: act.description || null,
+        crawling_id: null // activities 데이터는 crawling_id가 없을 수 있음
+      };
     }
-    console.log(`[LOG][FETCH] Found title: ${crawl.title}`);
 
     // 2. user_activities에 이미 있는지 확인 (중복 생성 방지)
     let { data: existingActivity } = await supabase
       .from('user_activities')
       .select('id')
-      .or(`crawling_id.eq.${crawlingId},title.eq."${crawl.title.trim()}"`)
+      .or(`crawling_id.eq.${crawlingId},title.eq."${normalizedData.title}"`)
       .maybeSingle();
 
     let activityUuid = existingActivity?.id;
 
     if (!activityUuid) {
       console.log(`[LOG][CREATE] New record needed for user_activities`);
-      const safeStartDate = (crawl.start_date && crawl.start_date.trim() !== "") ? crawl.start_date : null;
-      const safeDeadline = (crawl.end_date && crawl.end_date.trim() !== "") ? crawl.end_date : null;
-
       const { data: newActivity, error: insertError } = await supabase
         .from('user_activities')
-        .insert([{
-          title: crawl.title.trim(),
-          type: crawl.category || crawl.subject || "대외활동",
-          provider: crawl.organization || "알 수 없음",
-          start_date: safeStartDate,
-          deadline: safeDeadline,
-          url: crawl.homepage || null,
-          content: crawl.description || null,
-          crawling_id: crawlingId
-        }])
+        .insert([normalizedData])
         .select('id')
         .single();
 
