@@ -1,7 +1,7 @@
 [project]
 name = "devstep-ai"
 version = "0.1.0"
-description = "Add your description here"
+description = "DevStep AI Worker — FastAPI microservice for RAG, vector search, AI roadmap generation, and background crawling tasks"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
