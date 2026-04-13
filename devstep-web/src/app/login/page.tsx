@@ -66,19 +66,6 @@ export default function LoginPage() {
         {/* Bottom Footer Info */}
         <div className="relative z-10 flex justify-between items-center border-t border-white/10 pt-8">
           <p className="text-gray-500 text-sm font-medium">© 2026 DevStep Inc. AI-Driven Analytics.</p>
-          <div className="flex gap-4">
-             <div className="flex -space-x-2">
-                {[1,2,3,4].map(idx => (
-                  <div key={idx} className="w-8 h-8 rounded-full border-2 border-gray-900 bg-gray-800 flex items-center justify-center overflow-hidden">
-                    <img src={`https://i.pravatar.cc/100?img=${idx * 10}`} alt="avatar" className="w-full h-full object-cover" />
-                  </div>
-                ))}
-             </div>
-             <div className="flex flex-col justify-center">
-                <span className="text-white text-xs font-bold leading-tight">10,000+</span>
-                <span className="text-gray-500 text-[10px] font-bold">크루 합류</span>
-             </div>
-          </div>
         </div>
       </div>
 
