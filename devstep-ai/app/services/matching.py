@@ -15,6 +15,9 @@ import logging
 import json
 import time
 
+import asyncio
+from typing import Any, Callable
+
 from google import genai
 from google.genai.types import HttpOptions, EmbedContentConfig
 from sqlalchemy import select
@@ -23,7 +26,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.models.activity import Activity
 from app.models.onboarding import OnboardingSurvey
-from app.services.matching_hooks import preprocess_query, inject_variables, postprocess_match
+from app.services.matching_hooks import (
+    preprocess_query,
+    inject_variables,
+    postprocess_match,
+    inject_variables_from_str
+)
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +54,9 @@ class MatchingService:
         self._eval_model = "gemini-3-flash-preview"
         self._embed_model = "gemini-embedding-001"
         self._dim = 3072
+
+        # [Root Cause Fix] 동시 실행 수 제한 (세마포어) - 이벤트 루프 블로킹 방지 및 리소스 제어
+        self._semaphore = asyncio.Semaphore(5)
 
         # [Root Cause Fix] 프롬프트 템플릿 메모리 캐싱 (런타임 Blocking I/O 제거)
         try:
@@ -113,7 +124,7 @@ class MatchingService:
 
     async def match(
         self,
-        db_factory, # Task 1: 커넥션 고갈 방지를 위해 세션 팩토리를 주입받음
+        db_factory: Callable[[], AsyncSession], # Task 1: 커넥션 고갈 방지를 위해 세션 팩토리를 주입받음
         user_id: str,
         target_job: str,
         manual_skills: list[str] | None = None,
@@ -122,82 +133,89 @@ class MatchingService:
         """
         Supabase 설문 기반 RAG 매칭 파이프라인 (DB Connection Starvation Fix Ver.)
         """
-        start_total = time.time()
-        
-        # 1. 기술 스택 결정
-        if manual_skills:
-            skills_to_use = manual_skills
-        else:
-            logger.info(f"유저({user_id})의 온보딩 설문 데이터를 조회합니다.")
-            # [DB Step 1] 유저 스킬 조회 (단기 세션)
-            async with db_factory() as db:
-                skills_to_use = await self._get_survey_skills(db, user_id)
+        async with self._semaphore:  # [Root Cause Fix] 동시 실행 수를 제한하여 이벤트 루프 과부하 방지
+            start_total = time.time()
             
-        if not skills_to_use:
-            logger.warning(f"유저({user_id})의 기술 스택 정보가 없습니다.")
-            return MatchResult(normalized_skills=[], matches=[])
+            # 1. 기술 스택 결정
+            if manual_skills:
+                skills_to_use = manual_skills
+            else:
+                logger.info(f"유저({user_id})의 온보딩 설문 데이터를 조회합니다.")
+                # [DB Step 1] 유저 스킬 조회 (단기 세션)
+                async with db_factory() as db:
+                    skills_to_use = await self._get_survey_skills(db, user_id)
+                
+            if not skills_to_use:
+                logger.warning(f"유저({user_id})의 기술 스택 정보가 없습니다.")
+                return MatchResult(normalized_skills=[], matches=[])
 
-        # 2. 정규화 (Input Hook) - [AI Step 1] (DB 커넥션 미사용)
-        start_step1 = time.time()
-        logger.info("파이프라인 Step 1: 기술 스택 정규화 시작")
-        
-        # 캐시된 템플릿 사용 (Sync I/O 제거)
-        template = self._templates.get("normalize", "")
-        # CPU 집약적 문자열 처리는 비동기 루프를 방해할 수 있으므로 주의 (필요 시 to_thread)
-        normalized = await preprocess_query(skills_to_use, self._client, template_override=template)
-        logger.info(f"파이프라인 Step 1 완료 (소요시간: {time.time() - start_step1:.4f}s)")
-        
-        # 3. 임베딩 및 검색
-        start_step2 = time.time()
-        logger.info(f"파이프라인 Step 2: {self._dim}차원 임베딩 및 DB 검색 (top_k=10)")
-        combined_text = ", ".join(normalized)
-        # [AI Step 2] 임베딩 생성 (DB 커넥션 미사용)
-        vector = await self._get_embedding(combined_text)
-        
-        # [DB Step 2] 후보군 검색 (단기 세션)
-        async with db_factory() as db:
-            candidates = await self._fetch_candidates(db, vector, top_k=10)
-        logger.info(f"파이프라인 Step 2 완료 (소요시간: {time.time() - start_step2:.4f}s)")
-        
-        if not candidates:
-            return MatchResult(normalized_skills=normalized, matches=[])
+            # 2. 정합성 있는 프롬프트 템플릿 로드
+            norm_template = self._templates.get("normalize", "")
+            match_template = self._templates.get("matching", "")
 
-        # 4. AI 심층 평가 (Prompt Injection)
-        start_step3 = time.time()
-        logger.info("파이프라인 Step 3: AI 심층 평가 시작 (Payload optimization)")
-        
-        # Task 3: 프롬프트 페이로드 다이어트 (Description 제외)
-        light_candidates = [
-            {
-                "activity_id": c["activity_id"],
-                "title": c["title"],
-                "required_skills": c["required_skills"]
+            # 3. 정규화 (Input Hook) - [AI Step 1] (DB 커넥션 미사용)
+            start_step1 = time.time()
+            logger.info("파이프라인 Step 1: 기술 스택 정규화 시작")
+            
+            # [Root Cause Fix] 내부 로직에서 asyncio.to_thread를 사용하여 I/O 및 CPU 부하 분산
+            normalized = await preprocess_query(skills_to_use, self._client, template_override=norm_template)
+            logger.info(f"파이프라인 Step 1 완료 (소요시간: {time.time() - start_step1:.4f}s)")
+            
+            # 4. 임베딩 및 검색
+            start_step2 = time.time()
+            logger.info(f"파이프라인 Step 2: {self._dim}차원 임베딩 및 DB 검색 (top_k=10)")
+            combined_text = ", ".join(normalized)
+            # [AI Step 2] 임베딩 생성 (DB 커넥션 미사용)
+            vector = await self._get_embedding(combined_text)
+            
+            # [DB Step 2] 후보군 검색 (단기 세션)
+            async with db_factory() as db:
+                candidates = await self._fetch_candidates(db, vector, top_k=10)
+            logger.info(f"파이프라인 Step 2 완료 (소요시간: {time.time() - start_step2:.4f}s)")
+            
+            if not candidates:
+                return MatchResult(normalized_skills=normalized, matches=[])
+
+            # 5. AI 심층 평가 (Prompt Injection)
+            start_step3 = time.time()
+            logger.info("파이프라인 Step 3: AI 심층 평가 시작 (Payload optimization)")
+            
+            # Task 3: 프롬프트 페이로드 다이어트 (Description 제외)
+            light_candidates = [
+                {
+                    "activity_id": c["activity_id"],
+                    "title": c["title"],
+                    "required_skills": c["required_skills"]
+                }
+                for c in candidates
+            ]
+            
+            variables = {
+                "target_job": target_job,
+                "skills": normalized,
+                "activities": light_candidates
             }
-            for c in candidates
-        ]
-        
-        variables = {
-            "target_job": target_job,
-            "skills": normalized,
-            "activities": light_candidates
-        }
-        
-        # [Root Cause Fix] 템플릿 치환 및 결과 파싱(CPU-bound)을 별도 스레드로 위임
-        import asyncio
-        from app.services.matching_hooks import inject_variables_from_str
-        
-        template = self._templates.get("matching", "")
-        prompt = await asyncio.to_thread(inject_variables_from_str, template, variables)
-        
-        response = await self._client.aio.models.generate_content(
-            model=self._eval_model,
-            contents=prompt
-        )
-        logger.info(f"파이프라인 Step 3 완료 (소요시간: {time.time() - start_step3:.4f}s)")
-        
-        # 5. 후처리 (Output Hook) - [Root Cause Fix] CPU 집약적 파싱을 스레드로 위임
-        logger.info("파이프라인 Step 5: 결과 검증 및 후처리")
-        final_matches = await asyncio.to_thread(postprocess_match, response.text)
+            
+            # [Root Cause Fix] 템플릿 치환 및 결과 파싱(CPU-bound)을 별도 스레드로 위임
+            prompt = await asyncio.to_thread(inject_variables_from_str, match_template, variables)
+            
+            response = await self._client.aio.models.generate_content(
+                model=self._eval_model,
+                contents=prompt
+            )
+            logger.info(f"파이프라인 Step 3 완료 (소요시간: {time.time() - start_step3:.4f}s)")
+            
+            # 6. 후처리 (Output Hook) - [Root Cause Fix] CPU 집약적 파싱을 스레드로 위임
+            # Pydantic 검증 및 정렬 포함
+            logger.info("파이프라인 Step 6: 결과 검증 및 후처리")
+            final_matches = await asyncio.to_thread(postprocess_match, response.text)
+            
+            logger.info(f"전체 매칭 파이프라인 완료 (총 소요시간: {time.time() - start_total:.4f}s)")
+            
+            return MatchResult(
+                normalized_skills=normalized,
+                matches=final_matches[:top_k]
+            )
         
         logger.info(f"전체 매칭 파이프라인 완료 (총 소요시간: {time.time() - start_total:.4f}s)")
         

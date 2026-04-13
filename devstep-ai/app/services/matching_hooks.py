@@ -5,6 +5,7 @@ DevStep AI — Activity Matching Hooks (Google GenAI Native)
 Google GenAI SDK를 사용하여 고속 정규화 및 데이터 검증을 수행합니다.
 """
 
+import asyncio
 import logging
 import json
 import re
@@ -26,37 +27,59 @@ class ActivityScore(BaseModel):
 
 
 # ─────────────────────────────────────────────
+# Helpers for Thread Delegation
+# ─────────────────────────────────────────────
+def _read_file_sync(path: Path) -> str:
+    return path.read_text(encoding="utf-8")
+
+def _parse_json_from_ai_response(raw_text: str) -> dict:
+    """
+    AI 응답에서 JSON을 추출하고 파싱하는 CPU 집약적 작업
+    """
+    # 마크다운 제거
+    cleaned = re.sub(r"```(?:json)?\n?(.*?)\n?```", r"\1", raw_text, flags=re.DOTALL).strip()
+    # JSON 시작/끝 탐색 (안정성 강화)
+    start_idx = cleaned.find("{")
+    end_idx = cleaned.rfind("}") + 1
+    if start_idx != -1 and end_idx != 0:
+        cleaned = cleaned[start_idx:end_idx]
+    
+    return json.loads(cleaned)
+
+
+# ─────────────────────────────────────────────
 # Input Hook (전처리)
 # ─────────────────────────────────────────────
 async def preprocess_query(raw_skills: list[str], client, template_override: str | None = None) -> list[str]:
     """
     유저의 파편화된 기술 스택 목록을 Google GenAI를 이용해 정규화.
+    [Root Cause Fix] 모든 블로킹 I/O 및 CPU 작업을 스레드로 위임.
     """
-    if template_override:
+    if template_override is not None: # 빈 문자열 허용 및 None 체크 정밀화
         template_str = template_override
     else:
         prompt_path = Path("app/prompts/normalize_skills.txt")
-        if not prompt_path.exists():
+        # [Root Cause Fix] 파일 존재 확인 및 읽기를 별도 스레드에서 수행
+        exists = await asyncio.to_thread(prompt_path.exists)
+        if not exists:
             logger.warning("정규화 프롬프트를 찾을 수 없습니다.")
             return raw_skills
-        template_str = prompt_path.read_text(encoding="utf-8")
+        template_str = await asyncio.to_thread(_read_file_sync, prompt_path)
         
     skills_str = ", ".join(str(s).strip() for s in raw_skills if s)
     
-    # 템플릿 변환
+    # 템플릿 변환 (간단한 치환이나 대량일 경우 CPU 점유 가능성 고려)
     prompt = template_str.replace("{{skills}}", skills_str)
     
     try:
-        # Google GenAI Native SDK 호출
+        # Google GenAI Native SDK 호출 (비동기)
         response = await client.aio.models.generate_content(
             model="gemini-3-flash-preview",
             contents=prompt,
         )
         
-        # JSON 추출 (마크다운 제거 포함)
-        raw_text = response.text
-        cleaned = re.sub(r"```(?:json)?\n?(.*?)\n?```", r"\1", raw_text, flags=re.DOTALL).strip()
-        parsed = json.loads(cleaned)
+        # [Root Cause Fix] JSON 추출 및 파싱(CPU-bound)을 스레드로 위임
+        parsed = await asyncio.to_thread(_parse_json_from_ai_response, response.text)
         
         normalized = parsed.get("normalized", [])
         return normalized if normalized else raw_skills
@@ -104,6 +127,8 @@ def postprocess_match(raw_response: str) -> list[dict]:
         if start_idx != -1 and end_idx != 0:
             cleaned = cleaned[start_idx:end_idx]
             
+        # [Root Cause Fix] 대량 데이터 파싱 시 루프 정지 방지를 위해 
+        # 이 함수는 이미 서비스 레벨에서 asyncio.to_thread로 호출됨을 보장함
         data = json.loads(cleaned)
     except json.JSONDecodeError as e:
         logger.error(f"JSON 파싱 에러: {e}\n원본 텍스트: {cleaned}")

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { getOnboardingSurvey } from "@/app/actions/user";
-import { getAIMatchedActivities } from "@/app/actions/match";
+import { useAIMatching } from "@/hooks/useAIMatching";
 import { 
   CheckCircle2, 
   CalendarPlus, 
@@ -27,11 +27,6 @@ import remarkGfm from "remark-gfm";
 export default function RoadmapPathfinder() {
   const [selectedJob, setSelectedJob] = useState("");
   const [isSubTasksExpanded, setIsSubTasksExpanded] = useState(false);
-
-  // AI Matching States
-  const [aiActivities, setAiActivities] = useState<any[]>([]);
-  const [isAILoading, setIsAILoading] = useState(false);
-  const [aiError, setAiError] = useState<string | null>(null);
 
   // AI Roadmap Data States
   const [roadmap, setRoadmap] = useState<any>(null);
@@ -129,12 +124,9 @@ export default function RoadmapPathfinder() {
   const roadmapSteps = roadmap?.milestones?.map((m: any, idx: number) => {
     const totalTopics = m.topics.length;
     const completedTopics = m.topics.filter((t: any) => t.status === "completed").length;
-    const inProgressTopics = m.topics.filter((t: any) => t.status === "in_progress").length;
     
-    let status = "pending";
-    if (completedTopics === totalTopics && totalTopics > 0) status = "completed";
-    else if (completedTopics > 0 || inProgressTopics > 0) status = "current";
-    else if (idx === 0) status = "current"; // 첫 단계는 기본적으로 진행 유도
+    const isCompleted = completedTopics === totalTopics && totalTopics > 0;
+    const status = isCompleted ? "completed" : "current";
 
     return {
       id: m.id,
@@ -145,7 +137,8 @@ export default function RoadmapPathfinder() {
         id: t.id,
         title: t.title,
         status: t.status,
-        content: t.content_md
+        content: t.content_md,
+        required_skills: t.required_skills || []
       })),
       raw: m
     };
@@ -163,39 +156,20 @@ export default function RoadmapPathfinder() {
 
   const selectedStep = roadmapSteps[selectedStepIdx];
 
-  // ── AI 추천 로직 (마일스톤이나 직무가 바뀔 때 실행) ──
-  useEffect(() => {
-    async function fetchAIRecommendations() {
-      if (!selectedJob) return;
-      
-      setIsAILoading(true);
-      setAiError(null);
-
-      // 현재 선택된 마일스톤의 모든 토픽에서 기술 스택 추출 (Flatten)
-      let targetSkills: string[] = [];
-      if (selectedStep && selectedStep.subTasks) {
-        const skillsSet = new Set<string>();
-        selectedStep.subTasks.forEach((task: any) => {
-          if (task.required_skills) {
-            task.required_skills.forEach((s: string) => skillsSet.add(s));
-          }
-        });
-        targetSkills = Array.from(skillsSet);
-      }
-
-      // 기술 스택이 없으면 직무 기반, 있으면 기술 스택 기반 매칭
-      const { data, error } = await getAIMatchedActivities(selectedJob, targetSkills.length > 0 ? targetSkills : undefined);
-      
-      if (error) {
-        setAiError(error);
-        setAiActivities([]);
-      } else if (data) {
-        setAiActivities(data.matches || []);
-      }
-      setIsAILoading(false);
+  // ── [Refactored] 커스텀 훅을 이용한 AI 추천 로드 ──
+  // 현재 선택된 마일스톤의 모든 토픽에서 기술 스택 추출
+  const currentSkills = selectedStep?.subTasks?.reduce((acc: string[], task: any) => {
+    if (task.required_skills) {
+      return [...acc, ...task.required_skills];
     }
-    fetchAIRecommendations();
-  }, [selectedJob, selectedStep?.id]);
+    return acc;
+  }, []) || [];
+
+  const { data: aiActivities, isLoading: isAILoading, error: aiError } = useAIMatching(
+    selectedJob, 
+    currentSkills, 
+    selectedStep?.id
+  );
 
 
   return (
@@ -257,13 +231,12 @@ export default function RoadmapPathfinder() {
                        {/* Node Circle */}
                        <div className={`w-8 h-8 rounded-full border-[3px] bg-white flex items-center justify-center shrink-0 transition-colors mt-0.5 ${
                           isCompleted ? "border-emerald-500 text-emerald-500 shadow-sm z-10" :
-                          isCurrent && isSelected ? "border-primary text-primary shadow-[0_0_15px_rgba(85,82,250,0.4)] z-10 scale-110" :
-                          isCurrent && !isSelected ? "border-primary/50 text-primary/50 z-10" :
-                          isSelected ? "border-gray-800 bg-gray-800 text-white z-10 scale-110" :
+                          isSelected ? "border-primary text-primary shadow-[0_0_15px_rgba(85,82,250,0.4)] z-10 scale-110" :
+                          isCurrent ? "border-primary/50 text-primary/50 z-10" :
                           "border-gray-300 hover:border-gray-400 z-10"
                        }`}>
                           {isCompleted && <CheckCircle2 className="w-5 h-5 text-emerald-500 border-none bg-white rounded-full" />}
-                          {!isCompleted && isCurrent && <div className="w-2.5 h-2.5 bg-primary rounded-full animate-pulse" />}
+                          {!isCompleted && isSelected && <div className="w-2.5 h-2.5 bg-primary rounded-full animate-pulse" />}
                        </div>
 
                        {/* Node Text Content */}
@@ -281,7 +254,7 @@ export default function RoadmapPathfinder() {
                            isCurrent ? "bg-primary/10 text-primary" : 
                            "bg-white border border-gray-200 text-gray-500"
                          }`}>
-                           {step.desc}
+                           {isCompleted ? "학습 완료" : "달성 가능"}
                          </span>
                        </div>
                       </div>
@@ -383,10 +356,9 @@ export default function RoadmapPathfinder() {
                   <div>
                     <span className={`text-xs font-bold px-2.5 py-1 rounded-md mb-3 inline-block ${
                        selectedStep.status === "completed" ? "bg-emerald-100 text-emerald-700" :
-                       selectedStep.status === "current" ? "bg-primary text-white" :
-                       "bg-gray-200 text-gray-600"
+                       "bg-primary text-white"
                     }`}>
-                      {selectedStep.status === "completed" ? "✅ 달성 완료" : selectedStep.status === "current" ? "🔥 현재 집중 목표" : "🔒 진행 예정 (Locked)"}
+                      {selectedStep.status === "completed" ? "✅ 달성 완료" : "🔥 상시 학습 가능"}
                     </span>
                     <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">{selectedStep.title}</h2>
                     <p className="text-sm font-medium text-gray-500 mt-2">이 마일스톤을 달성하여 핵심 역량을 확보하고 다음 단계로 진출하세요.</p>
