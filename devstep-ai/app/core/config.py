@@ -20,8 +20,17 @@ class Settings(BaseSettings):
         extra="ignore",  # .env에 정의된 기타 변수 무시
     )
 
-    # ── Database (PostgreSQL / Supabase) ──
-    DATABASE_URL: str = "postgresql://devstep:devstep_local_2026@db:5432/devstep_db"
+    # ── Database Strategy ──
+    DB_MODE: str = "local" # local | supabase
+    LOCAL_DATABASE_URL: str = "postgresql://devstep:devstep_local_2026@db:5432/devstep_db"
+    SUPABASE_DATABASE_URL: str = ""
+
+    @property
+    def DATABASE_URL(self) -> str:
+        """DB_MODE에 따라 적절한 데이터베이스 URL을 반환합니디."""
+        if self.DB_MODE.lower() == "supabase":
+            return self.SUPABASE_DATABASE_URL
+        return self.LOCAL_DATABASE_URL
 
     # ── Supabase Cloud ──
     SUPABASE_URL: str = ""
