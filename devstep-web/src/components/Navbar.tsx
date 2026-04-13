@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { User, Activity, Map, LayoutDashboard, Calendar, LogOut, Sparkles, Zap } from "lucide-react";
+import { User, Activity, Map, LayoutDashboard, Calendar, LogOut, Zap } from "lucide-react";
 import { useSearchParams, usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
 import { createClient } from "@/utils/supabase/client";
@@ -83,10 +83,7 @@ function NavbarContent() {
       </nav>
       
       <div className="flex items-center space-x-3 lg:space-x-4">
-        <Link href="/dashboard?tab=roadmap" className="hidden lg:flex items-center justify-center gap-2 px-4 py-2 text-sm font-bold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all shadow-sm group">
-          <Sparkles className="w-4 h-4 text-primary group-hover:animate-pulse" />
-          나만의 로드맵 추천
-        </Link>
+
 
         <Link href="/setup/point-a" className="hidden lg:flex items-center justify-center gap-2 px-4 py-2 text-sm font-bold text-white bg-primary rounded-xl hover:bg-primary/90 transition-all shadow-md shadow-primary/20 group">
           <Zap className="w-4 h-4 fill-white group-hover:animate-bounce" />

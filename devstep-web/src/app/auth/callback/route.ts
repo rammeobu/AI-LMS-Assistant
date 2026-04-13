@@ -8,6 +8,12 @@ export async function GET(request: Request) {
   // if "next" is in param, use it as the redirect URL
   const next = searchParams.get('next') ?? '/dashboard'
 
+  // Docker 컨테이너 내부에서는 origin이 0.0.0.0:3000이 되므로, 
+  // 브라우저에서 접근 가능한 주소로 보정
+  const safeOrigin = origin.includes('0.0.0.0') 
+    ? origin.replace('0.0.0.0', 'localhost') 
+    : origin
+
   if (code) {
     const supabase = await createClient()
     const { data: { session }, error } = await supabase.auth.exchangeCodeForSession(code)
@@ -32,22 +38,22 @@ export async function GET(request: Request) {
           .single()
 
         if (dbError || !userData?.is_onboarded) {
-          return NextResponse.redirect(`${origin}/onboarding`)
+          return NextResponse.redirect(`${safeOrigin}/onboarding`)
         }
       }
 
       const forwardedHost = request.headers.get('x-forwarded-host')
       const isLocalEnv = process.env.NODE_ENV === 'development'
       if (isLocalEnv) {
-        return NextResponse.redirect(`${origin}${next}`)
+        return NextResponse.redirect(`${safeOrigin}${next}`)
       } else if (forwardedHost) {
         return NextResponse.redirect(`https://${forwardedHost}${next}`)
       } else {
-        return NextResponse.redirect(`${origin}${next}`)
+        return NextResponse.redirect(`${safeOrigin}${next}`)
       }
     }
   }
 
   // return the user to an error page with instructions
-  return NextResponse.redirect(`${origin}/auth/auth-code-error`)
+  return NextResponse.redirect(`${safeOrigin}/auth/auth-code-error`)
 }

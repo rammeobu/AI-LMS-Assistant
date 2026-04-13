@@ -103,9 +103,7 @@ CREATE TABLE IF NOT EXISTS public.crawling_data (
     target          VARCHAR(100),
     homepage        TEXT,
     description     TEXT,
-    created_at      TIMESTAMPTZ DEFAULT NOW(),
-    is_processed    BOOLEAN DEFAULT FALSE,
-    last_error      TEXT
+    created_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ──────────────────────────────────────────────

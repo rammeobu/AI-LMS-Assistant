@@ -6,16 +6,16 @@ services:
       dockerfile: Dockerfile
       target: deps
       args:
+        - NEXT_PUBLIC_API_URL=http://localhost:8000
         - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
         - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
     container_name: devstep-web
     ports:
       - "3000:3000"
-    env_file: ./devstep-web/.env.local
+    env_file: ./.env.local
     volumes:
       - ./devstep-web:/app
       - /app/node_modules
-      - /app/.next
     environment:
       - NODE_ENV=development
       - NEXT_PUBLIC_AI_API_URL=http://devstep-ai:8000
@@ -30,7 +30,7 @@ services:
     container_name: devstep-ai
     ports:
       - "8000:8000"
-    env_file: ./devstep-ai/.env
+    env_file: ./.env.web
     volumes:
       - ./devstep-ai:/app
       - /app/.venv
@@ -49,7 +49,7 @@ services:
       context: ./devstep-ai
       dockerfile: Dockerfile
     container_name: devstep-worker
-    env_file: ./devstep-ai/.env
+    env_file: ./.env.web
     volumes:
       - ./devstep-ai:/app
       - /app/.venv
@@ -76,7 +76,7 @@ services:
       - pgdata:/var/lib/postgresql/data
       - ./devstep-ai/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-devstep} -d ${POSTGRES_DB:-devstep_db}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-devstep} -d ${POSTGRES_DB:-devstep_db}" ]
       interval: 5s
       timeout: 5s
       retries: 5

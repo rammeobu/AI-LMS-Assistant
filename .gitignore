@@ -3,6 +3,11 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+#임의추가
+.env*
+devstep-ai/.env*
+google-credentials.json
+
 # C extensions
 *.so
 
