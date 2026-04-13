@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
+from app.core.database import get_db, async_session_factory
 from app.services.matching import MatchingService
 
 router = APIRouter()
@@ -68,7 +68,6 @@ _matching_service = MatchingService()
 )
 async def match_activities(
     body: MatchRequest,
-    db: AsyncSession = Depends(get_db),
 ) -> MatchResponse:
     try:
         result = await _matching_service.match(
