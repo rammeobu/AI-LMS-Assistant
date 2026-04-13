@@ -1,11 +1,11 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
-import { Octokit } from 'octokit'
-import { GoogleGenerativeAI } from '@google/generative-ai'
+
+const AI_BACKEND_URL = process.env.NEXT_PUBLIC_AI_API_URL || 'http://localhost:8000'
 
 /**
- * 사용자의 GitHub 토큰이 유효하게 존재하는지 확인합니다. (일회용 토큰 여부 체크)
+ * 사용자의 GitHub 토큰이 유효하게 존재하는지 확인합니다.
  */
 export async function checkGithubToken(): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient()
@@ -29,100 +29,87 @@ export async function checkGithubToken(): Promise<{ success: boolean; error?: st
 }
 
 /**
- * GitHub 레포지토리와 README를 분석하여 기술 스택을 추출하는 서버 액션
+ * AI 백엔드에 GitHub 기술 스택 추출 작업을 요청합니다. (비동기 트리거)
  */
-export async function analyzeGithubStackWithAI() {
+export async function triggerGithubStackAnalysis() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  const { data: { session } } = await supabase.auth.getSession()
 
-  if (!user) {
+  if (!user || !session) {
     return { success: false, error: '로그인이 필요합니다.' }
   }
 
-  // 1. DB에서 GitHub 토큰 조회
-  const { data: userData, error: dbError } = await supabase
+  // DB에서 토큰 조회
+  const { data: userData } = await supabase
     .from('users')
     .select('github_token')
     .eq('id', user.id)
     .single()
 
-  if (dbError || !userData?.github_token) {
-    return { success: false, error: '연동된 GitHub 계정이 없거나 토큰이 만료되었습니다. 다시 로그인해 주세요.' }
+  if (!userData?.github_token) {
+    return { success: false, error: 'GitHub 토큰이 없습니다. 다시 연동해주세요.' }
   }
 
   try {
-    const octokit = new Octokit({ auth: userData.github_token })
-    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY!)
-    const model = genAI.getGenerativeModel({ model: 'gemini-flash-lite-latest' })
-
-    // 2. [최적화] 최근 업데이트된 공개 레포지토리 10개만 가져오기 (Timeout 방지)
-    const { data: repos } = await octokit.rest.repos.listForAuthenticatedUser({
-      type: 'public',
-      sort: 'updated',
-      per_page: 10
+    const response = await fetch(`${AI_BACKEND_URL}/api/v1/extract/github`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify({
+        user_id: user.id,
+        github_token: userData.github_token
+      })
     })
 
-    if (repos.length === 0) {
-      // 레포지토리가 없더라도 토큰은 삭제 (일회성 정책)
-      await supabase.from('users').update({ github_token: null }).eq('id', user.id)
-      return { success: true, skills: [], message: '분석할 레포지토리가 없습니다.' }
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.detail || '백엔드 작업 요청 실패')
     }
 
-    // 3. 메타데이터 분석 및 주요 README 선별
-    const sortedRepos = repos; // 이미 정렬되어 가져옴
-
-    const repoContexts = await Promise.all(sortedRepos.map(async (repo) => {
-      let readme = ''
-      try {
-        const { data: readmeData } = await octokit.rest.repos.getReadme({
-          owner: repo.owner.login,
-          repo: repo.name,
-        })
-        readme = Buffer.from(readmeData.content, 'base64').toString('utf8').slice(0, 800)
-      } catch (e) {}
-
-      return `Project: ${repo.name} | Lang: ${repo.language} | Desc: ${repo.description || ''}\nREADME: ${readme}\n`
-    }))
-
-    const allRepoSummary = repos.map(r => `${r.name}(${r.language})`).join(', ')
-
-    // 4. Gemini AI에게 분석 요청
-    const prompt = `
-당신은 개발자의 GitHub 활동을 분석하여 기술 스택을 식별하는 전문가입니다.
-사용자의 전체 공개 레포지토리 리스트: ${allRepoSummary}
-
-특히 다음 주요 프로젝트들의 상세 내용입니다:
-${repoContexts.join('\n\n')}
-
-위 정보를 종합하여 이 개발자가 실무적으로 가장 많이 활용하고 전문성을 가진 기술 스택을 추출하세요.
-응답은 반드시 ["React", "TypeScript", "Node.js", ...]와 같은 JSON 문자열 배열 형식으로만 대답해 주세요.
-`
-
-    const aiResult = await model.generateContent(prompt)
-    const responseText = aiResult.response.text()
-    const jsonMatch = responseText.match(/\[[\s\S]*\]/)
-    const skills = jsonMatch ? JSON.parse(jsonMatch[0]) : []
-
-    // 5. [중요] 일회성 토큰 정책: 분석 완료 후 토큰 즉시 삭제
-    await supabase
-      .from('users')
-      .update({ github_token: null })
-      .eq('id', user.id)
-
-    return { 
-      success: true, 
-      skills: skills as string[],
-      message: `총 ${repos.length}개의 레포지토리를 분석하여 ${skills.length}개의 기술 스택을 추출했습니다. (보안을 위해 토큰은 즉시 삭제되었습니다.)`
-    }
-
-  } catch (error: any) {
-    console.error('GitHub AI Analysis error:', error)
-    // 에러 발생 시에도 보안을 위해 토큰 삭제 시도
-    await supabase.from('users').update({ github_token: null }).eq('id', user.id)
-    
-    return { 
-      success: false, 
-      error: error.message || 'AI 분석 중 오류가 발생했습니다.' 
-    }
+    return { success: true, message: '분석 작업이 시작되었습니다.' }
+  } catch (err: any) {
+    console.error('Trigger GitHub Analysis Error:', err.message)
+    return { success: false, error: err.message }
   }
+}
+
+/**
+ * AI 백엔드에서 추출된 기술 스택 상태를 폴링합니다.
+ */
+export async function pollGithubStackStatus(): Promise<{ status: 'pending' | 'completed' | 'processing'; skills: string[] }> {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { session } } = await supabase.auth.getSession()
+
+    if (!user || !session) {
+        throw new Error('인증 필요')
+    }
+
+    try {
+        const response = await fetch(`${AI_BACKEND_URL}/api/v1/extract/github/status/${user.id}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${session.access_token}`
+            }
+        })
+
+        if (!response.ok) {
+            throw new Error('상태 조회 실패')
+        }
+
+        return await response.json()
+    } catch (err: any) {
+        console.error('Poll GitHub Status Error:', err.message)
+        return { status: 'pending', skills: [] }
+    }
+}
+
+/**
+ * 이전 버전의 호환성을 위해 남겨둔 래퍼 (내부적으로 트리거 호출)
+ */
+export async function analyzeGithubStackWithAI() {
+    return triggerGithubStackAnalysis()
 }

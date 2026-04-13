@@ -37,6 +37,10 @@ class User(Base):
     # 온보딩 완료 여부
     is_onboarded: Mapped[bool] = mapped_column(Boolean, default=False)
     
+    # GitHub 연동 정보
+    github_token: Mapped[str | None] = mapped_column(Text)
+    github_username: Mapped[str | None] = mapped_column(String(100))
+    
     # 메타데이터
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

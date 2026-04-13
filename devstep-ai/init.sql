@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS public.users (
     name            VARCHAR(100),
     avatar_url      TEXT,
     is_onboarded    BOOLEAN DEFAULT FALSE,
+    github_token    TEXT,
+    github_username VARCHAR(100),
     created_at      TIMESTAMPTZ DEFAULT NOW(),
     updated_at      TIMESTAMPTZ DEFAULT NOW()
 );

@@ -3,6 +3,7 @@ import logging
 from app.worker.celery_app import celery_app
 from app.core.database import async_session_factory
 from app.services.normalization import NormalizationService
+from app.services.github_analysis import GitHubAnalysisService
 
 logger = logging.getLogger(__name__)
 
@@ -53,3 +54,36 @@ def generate_roadmap_task(roadmap_id: str, user_id: str):
     loop = asyncio.get_event_loop()
     loop.run_until_complete(_run())
     return f"Roadmap generation task completed for {roadmap_id}"
+
+@celery_app.task(name="devstep.analyze_github_stack")
+def analyze_github_stack_task(user_id: str, github_token: str):
+    """
+    백그라운드에서 GitHub 레포지토리를 분석하여 기술 스택을 추출합니다.
+    """
+    async def _run():
+        service = GitHubAnalysisService()
+        skills = await service.analyze_stack(github_token)
+        
+        if skills:
+            from app.models.onboarding import Portfolio
+            from sqlalchemy import select
+            async with async_session_factory() as db:
+                # 포트폴리오 테이블에 기술 스택 저장 (Upsert 스타일)
+                stmt = select(Portfolio).where(Portfolio.user_id == user_id)
+                result = await db.execute(stmt)
+                portfolio = result.scalar_one_or_none()
+                
+                if portfolio:
+                    portfolio.tech_stacks = list(set((portfolio.tech_stacks or []) + skills))
+                else:
+                    new_portfolio = Portfolio(user_id=user_id, tech_stacks=skills)
+                    db.add(new_portfolio)
+                
+                await db.commit()
+                logger.info(f"GitHub Stack Analysis saved for user {user_id}")
+        
+        return skills
+
+    loop = asyncio.get_event_loop()
+    result = loop.run_until_complete(_run())
+    return f"Analysis complete for {user_id}: {result}"

@@ -29,7 +29,7 @@ import {
   Layout
 } from "lucide-react";
 import { completeUnifiedOnboarding, getOnboardingSurvey } from "@/app/actions/user";
-import { analyzeGithubStackWithAI, checkGithubToken } from "@/app/actions/github";
+import { triggerGithubStackAnalysis, pollGithubStackStatus, checkGithubToken } from "@/app/actions/github";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 
@@ -42,6 +42,7 @@ function UnifiedSurveyContent() {
   const [isFinished, setIsFinished] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [scanStatus, setScanStatus] = useState<string>("준비 중...");
   
   // Point A + Point B 통합 데이터 상태
   const [surveyData, setSurveyData] = useState({
@@ -100,12 +101,12 @@ function UnifiedSurveyContent() {
 
   const handleGithubScan = async () => {
     setIsScanning(true);
+    setScanStatus("GitHub 권한 확인 중...");
     try {
-      // 1. 먼저 DB에 토큰이 있는지 확인 (리다이렉트 최소화)
+      // 1. 먼저 DB에 토큰이 있는지 확인
       const tokenStatus = await checkGithubToken();
       
       if (!tokenStatus.success) {
-        // 토큰이 없으면 OAuth 유도
         const supabase = createClient();
         await supabase.auth.linkIdentity({
           provider: 'github',
@@ -114,22 +115,50 @@ function UnifiedSurveyContent() {
             scopes: 'read:user repo'
           }
         });
-        return; // 리다이렉트되므로 아래 로직 실행 안 함
+        return;
       }
 
-      // 2. 토큰이 있으면 바로 AI 분석 실행
-      const result = await analyzeGithubStackWithAI();
-      if (result.success && result.skills) {
-        const combinedSkills = Array.from(new Set([...surveyData.skills, ...result.skills]));
-        setSurveyData(prev => ({ ...prev, skills: combinedSkills }));
-        setIsScanCompleted(true);
-        alert(result.message);
-      } else {
-        alert(result.error || "분석 중 오류가 발생했습니다.");
+      // 2. 백엔드 분석 작업 트리거
+      setScanStatus("AI 분석 작업 요청 중...");
+      const triggerResult = await triggerGithubStackAnalysis();
+      if (!triggerResult.success) {
+        throw new Error(triggerResult.error || "분석 요청 실패");
       }
+
+      // 3. 폴링 시작
+      setScanStatus("레포지토리 및 README 수집 중...");
+      let attempts = 0;
+      const maxAttempts = 30; // 30초 ~ 60초 대기
+
+      const poll = async () => {
+        if (attempts >= maxAttempts) {
+          setIsScanning(false);
+          alert("분석 시간이 너무 오래 걸립니다. 잠시 후 다시 확인해주세요.");
+          return;
+        }
+
+        const pollResult = await pollGithubStackStatus();
+        
+        if (pollResult.status === 'completed' && pollResult.skills.length > 0) {
+          const combinedSkills = Array.from(new Set([...surveyData.skills, ...pollResult.skills]));
+          setSurveyData(prev => ({ ...prev, skills: combinedSkills }));
+          setIsScanCompleted(true);
+          setIsScanning(false);
+          setScanStatus("분석 완료!");
+        } else {
+          attempts++;
+          // 상태에 따른 상세 메시지 업데이트 (백엔드에서 더 자세한 상태를 주면 좋음)
+          if (attempts > 5) setScanStatus("Gemini AI가 코드를 분석하고 있습니다...");
+          if (attempts > 15) setScanStatus("거의 다 되었습니다. 기술 스택을 정리 중입니다...");
+          
+          setTimeout(poll, 2000); // 2초 간격 폴링
+        }
+      };
+
+      poll();
+
     } catch (err: any) {
       alert(err.message || "분석 중 오류가 발생했습니다.");
-    } finally {
       setIsScanning(false);
     }
   };
@@ -318,8 +347,8 @@ function UnifiedSurveyContent() {
                       <div className="flex flex-col items-center gap-6">
                         <Loader2 className="w-16 h-16 text-primary animate-spin" />
                         <div className="text-center">
-                          <p className="text-gray-900 text-xl font-black animate-pulse">Gemini AI가 전체 레포지토리 분석 중...</p>
-                          <p className="text-gray-400 text-sm font-bold mt-1">모든 프로젝트와 README를 읽고 있습니다.</p>
+                          <p className="text-gray-900 text-xl font-black animate-pulse">{scanStatus}</p>
+                          <p className="text-gray-400 text-sm font-bold mt-1">네트워크 환경에 따라 최대 1분이 소요될 수 있습니다.</p>
                         </div>
                       </div>
                     ) : (

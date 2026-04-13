@@ -34,7 +34,19 @@ async function main() {
     console.log('Row count:', data)
   }
 
-  console.log('\nChecking auth status...')
+  console.log('\n--- Verifying New Roadmap Tables ---')
+  const tables = ['roadmaps', 'milestones', 'topics', 'user_topic_progress']
+  
+  for (const table of tables) {
+    const { data, error } = await supabase.from(table).select('count', { count: 'exact', head: true })
+    if (error) {
+      console.error(`❌ Table "${table}" check failed:`, error.message)
+    } else {
+      console.log(`✅ Table "${table}" is ready. (Row count: ${data})`)
+    }
+  }
+
+  console.log('\n--- Auth Status Check ---')
   const { data: authData, error: authError } = await supabase.auth.getSession()
   if (authError) {
     console.error('Auth Check Failed:', authError.message)

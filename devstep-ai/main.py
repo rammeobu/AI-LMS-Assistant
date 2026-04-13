@@ -14,7 +14,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
-from app.api.endpoints import health, match, roadmaps
+from app.api.endpoints import health, match, roadmaps, extract
 
 settings = get_settings()
 
@@ -51,3 +51,4 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(match.router, prefix="/api/v1/match", tags=["Matching"])
 app.include_router(roadmaps.router, prefix="/api/v1/roadmaps", tags=["Roadmap & LMS"])
+app.include_router(extract.router, prefix="/api/v1/extract", tags=["GitHub Extraction"])
