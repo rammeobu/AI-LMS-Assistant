@@ -41,6 +41,9 @@ export default function RoadmapPathfinder() {
   // Topic Detail (Side Panel) States
   const [selectedTopic, setSelectedTopic] = useState<any>(null);
 
+  // Onboarding status check
+  const [hasSurvey, setHasSurvey] = useState<boolean | null>(null); // null: checking, false: no survey, true: exists
+
   const fetchRoadmap = async () => {
     const { data, error } = await getActiveRoadmap();
     if (error) {
@@ -90,10 +93,13 @@ export default function RoadmapPathfinder() {
   // ── Initialization Fetch ──
   useEffect(() => {
     async function init() {
-      // 1. 유저 목표 직무 가져오기
+      // 1. 유저 목표 직무 및 진단 데이터 존재 여부 확인
       const { data: surveyData } = await getOnboardingSurvey();
       if (surveyData && surveyData.point_a) {
+        setHasSurvey(true);
         setSelectedJob(surveyData.point_a.target_job || (surveyData.point_a.interests?.[0] || ""));
+      } else {
+        setHasSurvey(false);
       }
       // 2. 활성화된 로드맵 가져오기
       await fetchRoadmap();
@@ -292,7 +298,54 @@ export default function RoadmapPathfinder() {
 
            <div className="lg:col-span-3 p-6 lg:p-8 animate-in slide-in-from-right-4 fade-in duration-300" key={selectedStepIdx}>
               
-              {(!selectedStep || (roadmap && roadmap.status === "generating" && (!roadmap.milestones || roadmap.milestones.length === 0))) ? (
+              {(!roadmap && hasSurvey === false) ? (
+                // Case 1: 정밀 진단을 안 한 경우
+                <div className="flex flex-col items-center justify-center h-full gap-6 text-center py-20 px-6">
+                  <div className="w-20 h-20 bg-amber-50 rounded-3xl flex items-center justify-center border border-amber-100 shadow-sm">
+                    <Target className="w-10 h-10 text-amber-500" />
+                  </div>
+                  <div className="max-w-md">
+                    <h2 className="text-2xl font-black text-gray-900 mb-3">아직 정밀 진단 전이시네요!</h2>
+                    <p className="text-gray-500 font-medium leading-relaxed">
+                      AI 로드맵을 설계하기 위해서는 현재의 기술 스택과<br/> 
+                      지향하는 목표를 먼저 파악해야 합니다.
+                    </p>
+                  </div>
+                  <Link 
+                    href="/setup/point-a"
+                    className="flex items-center gap-3 bg-primary text-white px-8 py-4 rounded-2xl font-bold hover:scale-105 transition-all shadow-xl shadow-primary/20"
+                  >
+                    커리어 정밀 진단 시작하기
+                    <ArrowRight className="w-5 h-5" />
+                  </Link>
+                </div>
+              ) : (!roadmap && hasSurvey === true && !isRoadmapLoading) ? (
+                // Case 2: 진단은 했으나 생성된 로드맵이 없는 경우
+                <div className="flex flex-col items-center justify-center h-full gap-6 text-center py-20 px-6">
+                  <div className="w-20 h-20 bg-primary/5 rounded-3xl flex items-center justify-center border border-primary/10 shadow-sm">
+                    <Sparkles className="w-10 h-10 text-primary" />
+                  </div>
+                  <div className="max-w-md">
+                    <h2 className="text-2xl font-black text-gray-900 mb-3">로드맵을 생성할 준비가 되었습니다</h2>
+                    <p className="text-gray-500 font-medium leading-relaxed">
+                      작성해주신 진단 데이터를 바탕으로<br/>
+                      Gemini AI가 최적의 이직 패스를 설계해 드립니다.
+                    </p>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      // 여기에 로드맵 생성 트리거 로직 추가 가능
+                      // 현재는 진단 페이지 마지막에서 자동 트리거됨을 가정
+                      window.location.href = "/setup/point-a"; // 다시 진단 페이지로 가거나 명시적 생성 액션 호출
+                    }}
+                    className="flex items-center gap-3 bg-gray-900 text-white px-8 py-4 rounded-2xl font-bold hover:scale-105 transition-all shadow-xl shadow-gray-200"
+                  >
+                    AI 로드맵 생성 시작
+                    <Zap className="w-5 h-5 text-yellow-400" />
+                  </button>
+                </div>
+              ) : (!selectedStep || (roadmap && roadmap.status === "generating" && (!roadmap.milestones || roadmap.milestones.length === 0))) ? (
+                // Case 3: 생성 중인 경우 (진행 상황 표시)
                 <div className="flex flex-col items-center justify-center h-full gap-5 text-center py-12">
                    <div className="relative">
                       <div className="w-24 h-24 bg-primary/5 rounded-full flex items-center justify-center animate-pulse">
@@ -301,16 +354,16 @@ export default function RoadmapPathfinder() {
                       <div className="absolute inset-0 w-24 h-24 border-4 border-primary border-t-transparent rounded-full animate-spin" />
                    </div>
                    <div>
-                     <h2 className="text-2xl font-black text-gray-900 mb-2">당신을 위한 최적의 커리어를 설계 중입니다</h2>
+                     <h2 className="text-2xl font-black text-gray-900 mb-2">
+                        {roadmap?.title || "당신을 위한 최적의 커리어를 설계 중입니다"}
+                     </h2>
                      <p className="text-sm text-gray-500 font-medium leading-relaxed">
                        Gemini AI 모델이 직무 역량과 관심사를 분석하여<br/>
                        성공적인 이직을 위한 하이브리드 로드맵을 구성하고 있습니다.
                      </p>
                    </div>
-                   <div className="flex items-center gap-3 mt-4">
-                      <span className="flex h-2 w-2 rounded-full bg-primary animate-bounce" />
-                      <span className="flex h-2 w-2 rounded-full bg-primary animate-bounce [animation-delay:-0.15s]" />
-                      <span className="flex h-2 w-2 rounded-full bg-primary animate-bounce [animation-delay:-0.3s]" />
+                   <div className="flex items-center gap-2 mt-4 bg-gray-50 px-4 py-2 rounded-full border border-gray-100">
+                      <span className="text-xs font-bold text-primary animate-pulse">AI 엔진 가동 중...</span>
                    </div>
                 </div>
               ) : selectedStep && (!selectedStep.subTasks || selectedStep.subTasks.length === 0) ? (

@@ -93,12 +93,24 @@ class RoadmapService:
 
             # 2. Phase 1: Milestone Structure Design (AI Only, With Retry)
             logger.info(f"[BG] Phase 1: Generating structure for Roadmap {roadmap_id}")
+            # [Progress] 1단계: 마일스톤 설계 중
+            async with db_factory() as p1_db:
+                await p1_db.execute(
+                    update(Roadmap).where(Roadmap.id == roadmap_id).values(title="[1/3] 커리어 마일스톤 설계 중...")
+                )
+                await p1_db.commit()
+
             roadmap_structure = await self._generate_structure_with_retry(user_context)
             milestones_data = roadmap_structure.get("milestones", [])
 
             # 3. Phase 2: Detailed Topics Generation (Batch Processing)
-            # Task: 단 1번의 API 호출로 모든 마일스톤의 토픽을 생성합니다.
             logger.info(f"[BG] Phase 2: Generating all topics in a single batch (Roadmap: {roadmap_id})")
+            # [Progress] 2단계: 상세 주제 생성 중
+            async with db_factory() as p2_db:
+                await p2_db.execute(
+                    update(Roadmap).where(Roadmap.id == roadmap_id).values(title="[2/3] 상세 학습 가이드 생성 중...")
+                )
+                await p2_db.commit()
             
             # 마일스톤 리스트 문자열 생성 (프롬프트 주입용)
             m_list_str = "\n".join([f"- {m['title']}" for m in milestones_data])
@@ -111,6 +123,12 @@ class RoadmapService:
 
             # 4. Phase 3: DB Unit of Work (Atomic Bulk Insert)
             logger.info(f"[BG] Phase 3: Committing all data for Roadmap {roadmap_id}")
+            # [Progress] 3단계: 최종 데이터 동기화 중
+            async with db_factory() as p3_db:
+                await p3_db.execute(
+                    update(Roadmap).where(Roadmap.id == roadmap_id).values(title="[3/3] 최종 데이터 동기화 중...")
+                )
+                await p3_db.commit()
             async with db_factory() as atomic_db:
                 try:
                     # 타이틀 업데이트

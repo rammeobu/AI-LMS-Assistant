@@ -108,6 +108,21 @@ export async function completeUnifiedOnboarding(formData: {
     throw new Error('인증된 유저가 아닙니다.')
   }
 
+  // 0. [Fix] public.users 테이블에 유저 레코드가 있는지 확인하고 보장 (ForeignKey 에러 방지)
+  const { error: userUpsertError } = await supabase
+    .from('users')
+    .upsert({
+      id: user.id,
+      email: user.email,
+      name: user.user_metadata?.full_name || user.user_metadata?.name || '',
+      avatar_url: user.user_metadata?.avatar_url || '',
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'id' });
+
+  if (userUpsertError) {
+    console.error('User profile upsert failed:', userUpsertError.message);
+  }
+
   // 1. AI 전용 설문 데이터 테이블에 JSON으로 저장 (Upsert)
   const { error: surveyError } = await supabase
     .from('onboarding_surveys')
