@@ -241,6 +241,10 @@ class RoadmapService:
             return {}
 
     async def get_active_roadmap(self, db: AsyncSession, user_id: str) -> Optional[Roadmap]:
+        import time
+        start = time.time()
+        logger.info(f"[PERF] get_active_roadmap DB start for user {user_id}")
+        
         stmt = (
             select(Roadmap)
             .options(selectinload(Roadmap.milestones).selectinload(Milestone.topics))
@@ -248,9 +252,16 @@ class RoadmapService:
             .order_by(Roadmap.created_at.desc())
         )
         result = await db.execute(stmt)
-        return result.scalar_one_or_none()
+        roadmap = result.scalar_one_or_none()
+        
+        logger.info(f"[PERF] get_active_roadmap DB took {time.time() - start:.4f}s")
+        return roadmap
 
     async def update_topic_status(self, db: AsyncSession, user_id: str, topic_id: str, status: str) -> UserTopicProgress:
+        import time
+        start = time.time()
+        
+        # 1. 조회 (인덱스 추가로 매우 빨라짐)
         stmt = select(UserTopicProgress).where(
             UserTopicProgress.user_id == user_id,
             UserTopicProgress.topic_id == topic_id
@@ -258,12 +269,17 @@ class RoadmapService:
         result = await db.execute(stmt)
         progress = result.scalar_one_or_none()
 
+        # 2. 업데이트 또는 생성
         if progress:
             progress.status = status
         else:
             progress = UserTopicProgress(user_id=user_id, topic_id=topic_id, status=status)
             db.add(progress)
 
+        # 3. 커밋 (이것만으로 DB 반영 완료)
         await db.commit()
-        await db.refresh(progress)
+        
+        # [Optimization] refresh() 제거. 필요한 정보는 이미 메모리에 있으며 
+        # 리프레시는 시드니 DB와 불필요한 왕복을 한 번 더 하게 만듬.
+        logger.info(f"[PERF] update_topic_status total: {time.time() - start:.4f}s")
         return progress

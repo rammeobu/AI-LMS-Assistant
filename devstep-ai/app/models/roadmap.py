@@ -35,7 +35,8 @@ class Roadmap(Base):
     user_id: Mapped[str] = mapped_column(
         PG_UUID(as_uuid=False), 
         ForeignKey("users.id", ondelete="CASCADE"), 
-        nullable=False
+        nullable=False,
+        index=True
     )
     
     title: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -73,7 +74,8 @@ class Milestone(Base):
     roadmap_id: Mapped[str] = mapped_column(
         PG_UUID(as_uuid=False), 
         ForeignKey("roadmaps.id", ondelete="CASCADE"), 
-        nullable=False
+        nullable=False,
+        index=True
     )
     
     title: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -104,7 +106,8 @@ class Topic(Base):
     milestone_id: Mapped[str] = mapped_column(
         PG_UUID(as_uuid=False), 
         ForeignKey("milestones.id", ondelete="CASCADE"), 
-        nullable=False
+        nullable=False,
+        index=True
     )
     
     title: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -134,13 +137,15 @@ class UserTopicProgress(Base):
     user_id: Mapped[str] = mapped_column(
         PG_UUID(as_uuid=False), 
         ForeignKey("users.id", ondelete="CASCADE"), 
-        nullable=False
+        nullable=False,
+        index=True
     )
     
     topic_id: Mapped[str] = mapped_column(
         PG_UUID(as_uuid=False), 
         ForeignKey("topics.id", ondelete="CASCADE"), 
-        nullable=False
+        nullable=False,
+        index=True
     )
     
     # status: todo, in_progress, completed

@@ -47,6 +47,18 @@ class MatchingService:
         self._embed_model = "gemini-embedding-001"
         self._dim = 3072
 
+        # [Root Cause Fix] 프롬프트 템플릿 메모리 캐싱 (런타임 Blocking I/O 제거)
+        try:
+            from pathlib import Path
+            self._templates = {
+                "matching": Path("app/prompts/matching_template.txt").read_text(encoding="utf-8"),
+                "normalize": Path("app/prompts/normalize_skills.txt").read_text(encoding="utf-8")
+            }
+            logger.info("Successfully cached prompt templates in memory.")
+        except Exception as e:
+            logger.error(f"Failed to cache templates: {e}")
+            self._templates = {}
+
     async def _get_survey_skills(self, db: AsyncSession, user_id: str) -> list[str]:
         """
         Supabase의 onboarding_surveys 테이블에서 유저의 현재 기술 스택을 가져옵니다.
@@ -128,7 +140,11 @@ class MatchingService:
         # 2. 정규화 (Input Hook) - [AI Step 1] (DB 커넥션 미사용)
         start_step1 = time.time()
         logger.info("파이프라인 Step 1: 기술 스택 정규화 시작")
-        normalized = await preprocess_query(skills_to_use, self._client)
+        
+        # 캐시된 템플릿 사용 (Sync I/O 제거)
+        template = self._templates.get("normalize", "")
+        # CPU 집약적 문자열 처리는 비동기 루프를 방해할 수 있으므로 주의 (필요 시 to_thread)
+        normalized = await preprocess_query(skills_to_use, self._client, template_override=template)
         logger.info(f"파이프라인 Step 1 완료 (소요시간: {time.time() - start_step1:.4f}s)")
         
         # 3. 임베딩 및 검색
@@ -165,7 +181,13 @@ class MatchingService:
             "skills": normalized,
             "activities": light_candidates
         }
-        prompt = inject_variables("app/prompts/matching_template.txt", variables)
+        
+        # [Root Cause Fix] 템플릿 치환 및 결과 파싱(CPU-bound)을 별도 스레드로 위임
+        import asyncio
+        from app.services.matching_hooks import inject_variables_from_str
+        
+        template = self._templates.get("matching", "")
+        prompt = await asyncio.to_thread(inject_variables_from_str, template, variables)
         
         response = await self._client.aio.models.generate_content(
             model=self._eval_model,
@@ -173,9 +195,9 @@ class MatchingService:
         )
         logger.info(f"파이프라인 Step 3 완료 (소요시간: {time.time() - start_step3:.4f}s)")
         
-        # 5. 후처리 (Output Hook)
+        # 5. 후처리 (Output Hook) - [Root Cause Fix] CPU 집약적 파싱을 스레드로 위임
         logger.info("파이프라인 Step 5: 결과 검증 및 후처리")
-        final_matches = postprocess_match(response.text)
+        final_matches = await asyncio.to_thread(postprocess_match, response.text)
         
         logger.info(f"전체 매칭 파이프라인 완료 (총 소요시간: {time.time() - start_total:.4f}s)")
         

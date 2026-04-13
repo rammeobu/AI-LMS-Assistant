@@ -28,16 +28,19 @@ class ActivityScore(BaseModel):
 # ─────────────────────────────────────────────
 # Input Hook (전처리)
 # ─────────────────────────────────────────────
-async def preprocess_query(raw_skills: list[str], client) -> list[str]:
+async def preprocess_query(raw_skills: list[str], client, template_override: str | None = None) -> list[str]:
     """
     유저의 파편화된 기술 스택 목록을 Google GenAI를 이용해 정규화.
     """
-    prompt_path = Path("app/prompts/normalize_skills.txt")
-    if not prompt_path.exists():
-        logger.warning("정규화 프롬프트를 찾을 수 없습니다.")
-        return raw_skills
+    if template_override:
+        template_str = template_override
+    else:
+        prompt_path = Path("app/prompts/normalize_skills.txt")
+        if not prompt_path.exists():
+            logger.warning("정규화 프롬프트를 찾을 수 없습니다.")
+            return raw_skills
+        template_str = prompt_path.read_text(encoding="utf-8")
         
-    template_str = prompt_path.read_text(encoding="utf-8")
     skills_str = ", ".join(str(s).strip() for s in raw_skills if s)
     
     # 템플릿 변환
@@ -69,8 +72,13 @@ def inject_variables(template_path: str, variables: dict) -> str:
     path = Path(template_path)
     if not path.exists():
         raise FileNotFoundError(f"프롬프트 파일을 찾을 수 없습니다: {template_path}")
-        
     template = path.read_text(encoding="utf-8")
+    return inject_variables_from_str(template, variables)
+
+def inject_variables_from_str(template: str, variables: dict) -> str:
+    """
+    문자열 템플릿의 {{변수명}} 슬롯을 치환 (메모리 캐시용)
+    """
     for key, value in variables.items():
         if isinstance(value, (list, dict)):
             value = json.dumps(value, ensure_ascii=False)

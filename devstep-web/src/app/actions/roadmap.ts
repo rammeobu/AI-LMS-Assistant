@@ -9,11 +9,14 @@ const AI_BACKEND_URL = process.env.INTERNAL_AI_API_URL || 'http://devstep-ai:800
  * AI 백엔드에서 현재 유저의 활성화된 로드맵 데이터를 가져옵니다.
  */
 export async function getActiveRoadmap() {
-  const supabase = await createClient()
+  const start = Date.now();
+  console.log('[PERF] getActiveRoadmap started');
   
-  // [Optimization] getUser()는 실제 DB나 Supabase API를 호출하므로 느림. 
-  // 세션 정보만 빠르게 가져오기 위해 getSession()만 사용.
+  const supabase = await createClient()
+  const authStart = Date.now();
+  
   const { data: { session } } = await supabase.auth.getSession()
+  console.log(`[PERF] getSession took ${Date.now() - authStart}ms`);
 
   if (!session || !session.user) {
     return { data: null, error: '인증된 유저가 아닙니다.' }
@@ -22,6 +25,7 @@ export async function getActiveRoadmap() {
   const user = session.user;
 
   try {
+    const fetchStart = Date.now();
     const response = await fetch(`${AI_BACKEND_URL}/api/v1/roadmaps/active?user_id=${user.id}`, {
       method: 'GET',
       headers: {
@@ -30,6 +34,7 @@ export async function getActiveRoadmap() {
       },
       next: { revalidate: 0 }
     })
+    console.log(`[PERF] Backend fetch took ${Date.now() - fetchStart}ms`);
 
     if (!response.ok) {
         if (response.status === 404) return { data: null, error: null }
@@ -38,6 +43,7 @@ export async function getActiveRoadmap() {
     }
 
     const result = await response.json()
+    console.log(`[PERF] getActiveRoadmap total: ${Date.now() - start}ms`);
     return { data: result, error: null }
   } catch (err: any) {
     console.error('Get Active Roadmap Action Error:', err.message)
@@ -49,10 +55,14 @@ export async function getActiveRoadmap() {
  * 특정 토픽의 학습 상태를 업데이트합니다.
  */
 export async function updateTopicStatus(topicId: string, status: 'todo' | 'in_progress' | 'completed') {
-  const supabase = await createClient()
+  const start = Date.now();
+  console.log(`[PERF] updateTopicStatus(${topicId}, ${status}) started`);
   
-  // [Optimization] 중복된 auth 호출 제거 및 클라이언트 사이드 캐시 활용 유도
+  const supabase = await createClient()
+  const authStart = Date.now();
+  
   const { data: { session } } = await supabase.auth.getSession()
+  console.log(`[PERF] updateTopicStatus.getSession took ${Date.now() - authStart}ms`);
 
   if (!session || !session.user) {
     return { data: null, error: '인증된 유저가 아닙니다.' }
@@ -61,6 +71,7 @@ export async function updateTopicStatus(topicId: string, status: 'todo' | 'in_pr
   const user = session.user;
 
   try {
+    const fetchStart = Date.now();
     const response = await fetch(`${AI_BACKEND_URL}/api/v1/roadmaps/topics/${topicId}/status?user_id=${user.id}`, {
       method: 'PATCH',
       headers: {
@@ -69,6 +80,7 @@ export async function updateTopicStatus(topicId: string, status: 'todo' | 'in_pr
       },
       body: JSON.stringify({ status }),
     })
+    console.log(`[PERF] updateTopicStatus.fetch took ${Date.now() - fetchStart}ms`);
 
     if (!response.ok) {
         const errorData = await response.json()
@@ -76,6 +88,7 @@ export async function updateTopicStatus(topicId: string, status: 'todo' | 'in_pr
     }
 
     const result = await response.json()
+    console.log(`[PERF] updateTopicStatus total: ${Date.now() - start}ms`);
     return { data: result, error: null }
   } catch (err: any) {
     console.error('Update Topic Status Error:', err.message)
